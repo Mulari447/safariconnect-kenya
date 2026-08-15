@@ -1,0 +1,361 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum AppRole {
+  admin
+  operator
+  customer
+}
+
+model User {
+  id                  String    @id @default(uuid())
+  email               String    @unique
+  passwordHash        String    @map("password_hash")
+  emailVerified       Boolean   @default(false) @map("email_verified")
+  verificationToken   String?   @unique @map("verification_token")
+  verificationExpires DateTime? @map("verification_expires")
+  resetToken          String?   @unique @map("reset_token")
+  resetExpires        DateTime? @map("reset_expires")
+  suspended           Boolean   @default(false)
+  createdAt           DateTime  @default(now()) @map("created_at")
+
+  profile           Profile?
+  roles             UserRole[]
+  tripRequests      TripRequest[]
+  operatorCompany   OperatorCompany?
+  leadRequests      LeadRequest[]
+  reviews           Review[]
+  reviewVotes       ReviewVote[]
+  reviewReports     ReviewReport[]
+
+  @@map("users")
+}
+
+model Profile {
+  userId             String   @id @map("user_id")
+  fullName           String?  @map("full_name")
+  nationality        String?
+  country             String?
+  phone               String?
+  preferredLanguage  String   @default("English") @map("preferred_language")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("profiles")
+}
+
+model UserRole {
+  id        String  @id @default(uuid())
+  userId    String  @map("user_id")
+  role      AppRole
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, role])
+  @@map("user_roles")
+}
+
+model Destination {
+  id          String   @id @default(uuid())
+  slug        String   @unique
+  name        String
+  county      String
+  region      String
+  category    String
+  summary     String   @db.Text
+  description String?  @db.Text
+  bestSeason  String?  @map("best_season")
+  activities  Json
+  highlights  Json
+  featured    Boolean  @default(false)
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@map("destinations")
+}
+
+model TripRequest {
+  id                   String    @id @default(uuid())
+  userId               String    @map("user_id")
+  destinationSlug      String?   @map("destination_slug")
+  destinationName      String    @map("destination_name")
+  startDate            DateTime? @map("start_date")
+  endDate              DateTime? @map("end_date")
+  flexibleDates        Boolean   @default(false) @map("flexible_dates")
+  adults               Int       @default(2)
+  children             Int       @default(0)
+  budgetUsd            Decimal?  @map("budget_usd")
+  accommodationType    String?   @map("accommodation_type")
+  transportPreference  String?   @map("transport_preference")
+  luxuryLevel          String?   @map("luxury_level")
+  activities           Json
+  nationality          String?
+  arrivalAirport       String?   @map("arrival_airport")
+  pickupLocation       String?   @map("pickup_location")
+  dietaryRequirements  String?   @map("dietary_requirements")
+  specialNeeds         String?   @map("special_needs")
+  notes                String?   @db.Text
+  status               String    @default("open")
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  leadRequests LeadRequest[]
+
+  @@map("trip_requests")
+}
+
+model OperatorCompany {
+  id                 String   @id @default(uuid())
+  ownerId            String   @unique @map("owner_id")
+  name               String
+  slug               String   @unique
+  description        String?  @db.Text
+  county             String?
+  phone              String?
+  email              String?
+  website            String?
+  licenseNumber      String?  @map("license_number")
+  logoUrl            String?  @map("logo_url")
+  verified           Boolean  @default(false)
+  businessRegNumber  String?  @map("business_reg_number")
+  kraPin             String?  @map("kra_pin")
+  katoMembership     String?  @map("kato_membership")
+  physicalAddress    String?  @map("physical_address")
+  mapsUrl            String?  @map("maps_url")
+  contactPerson      String?  @map("contact_person")
+  whatsapp           String?
+  coverImageUrl      String?  @map("cover_image_url")
+  yearsInBusiness    Int?     @map("years_in_business")
+  employees          Int?
+  languages          Json
+  vehicleTypes       Json     @map("vehicle_types")
+  safariSpecialties  Json     @map("safari_specialties")
+  tourCategories     Json     @map("tour_categories")
+  status             String   @default("pending")
+  adminNote          String?  @map("admin_note") @db.Text
+  reviewedAt         DateTime? @map("reviewed_at")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  owner         User                  @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  leadRequests  LeadRequest[]
+  reviews       Review[]
+  subscription  OperatorSubscription?
+  invoices      Invoice[]
+  payments      Payment[]
+  paymentReminders PaymentReminder[]
+
+  @@map("operator_companies")
+}
+
+model LeadRequest {
+  id              String    @id @default(uuid())
+  tripRequestId   String    @map("trip_request_id")
+  companyId       String    @map("company_id")
+  travellerId     String    @map("traveller_id")
+  message         String?   @db.Text
+  offerAmountKes  Decimal?  @map("offer_amount_kes")
+  packageDetails  String?   @map("package_details") @db.Text
+  offerValidUntil DateTime? @map("offer_valid_until")
+  status          String    @default("pending")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  tripRequest TripRequest     @relation(fields: [tripRequestId], references: [id], onDelete: Cascade)
+  company     OperatorCompany @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  traveller   User            @relation(fields: [travellerId], references: [id], onDelete: Cascade)
+
+  @@unique([tripRequestId, companyId])
+  @@map("lead_requests")
+}
+
+model Review {
+  id                String   @id @default(uuid())
+  userId            String   @map("user_id")
+  destinationSlug   String?  @map("destination_slug")
+  companyId         String?  @map("company_id")
+  rating            Int
+  title             String?
+  body              String   @db.Text
+  photos            Json
+  authorName        String?  @map("author_name")
+  verifiedTraveler  Boolean  @default(false) @map("verified_traveler")
+  helpfulCount      Int      @default(0) @map("helpful_count")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  user    User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  company OperatorCompany? @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  votes   ReviewVote[]
+  reports ReviewReport[]
+
+  @@map("reviews")
+}
+
+model ReviewVote {
+  id        String   @id @default(uuid())
+  reviewId  String   @map("review_id")
+  userId    String   @map("user_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  review Review @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([reviewId, userId])
+  @@map("review_votes")
+}
+
+model ReviewReport {
+  id         String   @id @default(uuid())
+  reviewId   String   @map("review_id")
+  reporterId String   @map("reporter_id")
+  reason     String
+  details    String?  @db.Text
+  status     String   @default("open")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  review   Review @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  reporter User   @relation(fields: [reporterId], references: [id], onDelete: Cascade)
+
+  @@unique([reviewId, reporterId])
+  @@map("review_reports")
+}
+
+model SubscriptionPlan {
+  id                 String   @id @default(uuid())
+  slug               String   @unique
+  name               String
+  description        String?  @db.Text
+  priceKes           Decimal  @default(0) @map("price_kes")
+  priceKesAnnual     Decimal  @default(0) @map("price_kes_annual")
+  leadLimitMonthly   Int?     @map("lead_limit_monthly")
+  storageMb          Int      @default(100) @map("storage_mb")
+  crmAccess          Boolean  @default(false) @map("crm_access")
+  reportsAccess      Boolean  @default(false) @map("reports_access")
+  staffAccounts      Int      @default(1) @map("staff_accounts")
+  packageLimit       Int?     @map("package_limit")
+  priorityRank       Int      @default(0) @map("priority_rank")
+  premiumBadge       Boolean  @default(false) @map("premium_badge")
+  featuredListing    Boolean  @default(false) @map("featured_listing")
+  sortOrder          Int      @default(0) @map("sort_order")
+  isActive           Boolean  @default(true) @map("is_active")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  subscriptions OperatorSubscription[]
+  invoices      Invoice[]
+
+  @@map("subscription_plans")
+}
+
+model OperatorSubscription {
+  id                  String   @id @default(uuid())
+  companyId           String   @unique @map("company_id")
+  planId              String   @map("plan_id")
+  status              String   @default("active")
+  currentPeriodStart  DateTime @default(now()) @map("current_period_start")
+  currentPeriodEnd    DateTime @map("current_period_end")
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  company OperatorCompany  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  plan    SubscriptionPlan @relation(fields: [planId], references: [id])
+
+  @@map("operator_subscriptions")
+}
+
+model Invoice {
+  id             String    @id @default(uuid())
+  companyId      String    @map("company_id")
+  planId         String?   @map("plan_id")
+  invoiceNumber  String    @unique @map("invoice_number")
+  billingCycle   String    @default("monthly") @map("billing_cycle")
+  amountKes      Decimal   @default(0) @map("amount_kes")
+  currency       String    @default("KES")
+  status         String    @default("pending")
+  description    String?   @db.Text
+  periodStart    DateTime  @default(now()) @map("period_start")
+  periodEnd      DateTime  @map("period_end")
+  dueDate        DateTime  @map("due_date")
+  paidAt         DateTime? @map("paid_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  company  OperatorCompany   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  plan     SubscriptionPlan? @relation(fields: [planId], references: [id])
+  payments Payment[]
+  reminders PaymentReminder[]
+
+  @@map("invoices")
+}
+
+model Payment {
+  id                  String   @id @default(uuid())
+  invoiceId           String?  @map("invoice_id")
+  companyId           String   @map("company_id")
+  provider            String   @default("intasend")
+  method              String   @default("mpesa")
+  amountKes           Decimal  @default(0) @map("amount_kes")
+  currency            String   @default("KES")
+  status              String   @default("pending")
+  apiRef              String?  @map("api_ref")
+  providerInvoiceId   String?  @map("provider_invoice_id")
+  providerState       String?  @map("provider_state")
+  mpesaReceipt        String?  @map("mpesa_receipt")
+  payerPhone          String?  @map("payer_phone")
+  payerEmail          String?  @map("payer_email")
+  checkoutUrl         String?  @map("checkout_url")
+  failureReason       String?  @map("failure_reason") @db.Text
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  invoice Invoice?        @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+  company OperatorCompany @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  events  PaymentEvent[]
+
+  @@index([providerInvoiceId])
+  @@index([apiRef])
+  @@map("payments")
+}
+
+model PaymentEvent {
+  id                 String   @id @default(uuid())
+  paymentId          String?  @map("payment_id")
+  provider           String   @default("intasend")
+  eventType          String   @map("event_type")
+  providerInvoiceId  String?  @map("provider_invoice_id")
+  payload            Json
+  createdAt          DateTime @default(now()) @map("created_at")
+
+  payment Payment? @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+
+  @@map("payment_events")
+}
+
+model PaymentReminder {
+  id         String    @id @default(uuid())
+  companyId  String    @map("company_id")
+  invoiceId  String?   @map("invoice_id")
+  kind       String    @default("renewal_upcoming")
+  channel    String    @default("email")
+  message    String?   @db.Text
+  dueAt      DateTime  @default(now()) @map("due_at")
+  sentAt     DateTime? @map("sent_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+
+  company OperatorCompany @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  invoice Invoice?        @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@map("payment_reminders")
+}

@@ -1,0 +1,1 @@
+REVOKE ALL ON FUNCTION public.company_plan(uuid) FROM PUBLIC, anon, authenticated;
