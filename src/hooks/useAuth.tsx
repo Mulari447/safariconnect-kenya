@@ -24,7 +24,7 @@ type AuthState = {
   signUp: (email: string, password: string, fullName?: string) => Promise<void>;
   signOut: () => Promise<void>;
   refresh: () => Promise<void>;
-  verifyEmail: (token: string) => Promise<void>;
+  verifyEmail: (token: string) => Promise<any>; // Updated return type
 };
 
 const AuthContext = createContext<AuthState>({
@@ -78,7 +78,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       password,
       fullName,
     });
-    // No token yet — the account isn't active until the user verifies their email.
   };
 
   const verifyEmail = async (token: string) => {
@@ -86,6 +85,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setToken(res.token);
     setUser(res.user);
     await loadMe();
+    return res; // CRITICAL: Returns the full verification response object with roles
   };
 
   const signOut = async () => {

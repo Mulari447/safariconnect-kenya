@@ -1,472 +1,451 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useMutation, useQuery, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
-import { api } from "@/lib/api";
+import { Calendar, Users, DollarSign, MapPin, Sparkles, Compass, Car, Plane, Utensils, HeartHandshake } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
-import { destinationsQuery } from "@/lib/queries";
-import { isAdminQuery } from "@/lib/plan-queries";
-import { myRolesQuery } from "@/lib/operator-queries";
+import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Switch } from "@/components/ui/switch";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { cn } from "@/lib/utils";
-
-type PlanSearch = { destination?: string | undefined };
 
 export const Route = createFileRoute("/plan-trip")({
-  validateSearch: (search: Record<string, unknown>): PlanSearch => ({
-    destination:
-      typeof search["destination"] === "string" && search["destination"]
-        ? search["destination"]
-        : undefined,
-  }),
-  loader: ({ context }) => context.queryClient.ensureQueryData(destinationsQuery),
   head: () => ({
     meta: [
-      { title: "Plan Your Kenya Trip — Get Operator Quotes | SafariConnect" },
+      { title: "Plan your Trip — SafariConnect Kenya" },
       {
         name: "description",
-        content:
-          "Describe your Kenya trip once — dates, party, budget and style — and licensed Kenyan tour operators send you tailored quotations.",
+        content: "Submit your dream Kenya safari request and receive custom competitive quotes from verified local tour operators.",
       },
-      { property: "og:title", content: "Plan Your Kenya Trip | SafariConnect Kenya" },
-      {
-        property: "og:description",
-        content: "One trip request, tailored quotes from licensed Kenyan tour operators.",
-      },
+      { property: "og:title", content: "Plan a Trip — SafariConnect Kenya" },
       { property: "og:url", content: "/plan-trip" },
     ],
     links: [{ rel: "canonical", href: "/plan-trip" }],
   }),
-  component: PlanTrip,
+  component: PlanTripPage,
 });
 
-const ACTIVITIES = [
-  "Game drives",
-  "Hot air ballooning",
-  "Beach",
-  "Diving & snorkelling",
-  "Trekking",
-  "Bird watching",
-  "Cultural visits",
-  "Photography",
-  "Camping",
-  "Honeymoon",
-];
-
-const schema = z.object({
-  destinationName: z.string().trim().min(2, "Choose a destination").max(120),
-  startDate: z.string().optional(),
-  endDate: z.string().optional(),
-  adults: z.number().int().min(1, "At least one adult").max(40),
-  children: z.number().int().min(0).max(40),
-  budget: z.number().min(0).max(1000000).optional(),
-  nationality: z.string().trim().max(80).optional(),
-  arrivalAirport: z.string().trim().max(80).optional(),
-  pickupLocation: z.string().trim().max(120).optional(),
-  dietary: z.string().trim().max(500).optional(),
-  specialNeeds: z.string().trim().max(500).optional(),
-  notes: z.string().trim().max(2000).optional(),
+const tripSchema = z.object({
+  destinationName: z.string().min(2, { message: "Please specify a destination or region" }),
+  startDate: z.string().min(1, { message: "Please select an estimated start date" }),
+  endDate: z.string().min(1, { message: "Please select an estimated end date" }),
+  flexibleDates: z.boolean(),
+  adults: z.number().min(1, { message: "At least 1 adult is required" }),
+  children: z.number().min(0, { message: "Please specify children count (or 0)" }),
+  budget: z.number().positive({ message: "Please enter a valid budget amount" }),
+  budgetCurrency: z.enum(["USD", "KES"]),
+  luxuryLevel: z.string().min(1, { message: "Please select a safari style" }),
+  accommodationType: z.string().min(1, { message: "Please select preferred accommodation" }),
+  transportPreference: z.string().min(1, { message: "Please select a transport preference" }),
+  nationality: z.string().min(1, { message: "Please select your residency status" }),
+  arrivalAirport: z.string().min(1, { message: "Please enter your arrival airport" }),
+  pickupLocation: z.string().min(1, { message: "Please enter your pickup location" }),
+  dietaryRequirements: z.string().min(1, { message: "Please specify dietary requirements (e.g. None)" }),
+  specialNeeds: z.string().min(1, { message: "Please specify special needs (e.g. None)" }),
+  notes: z.string().min(5, { message: "Please provide a brief note or itinerary detail" }).max(1000),
 });
 
-function PlanTrip() {
-  const { destination } = Route.useSearch();
-  const { data: destinations } = useSuspenseQuery(destinationsQuery);
-  const { user, loading } = useAuth();
-  const { data: isAdmin } = useQuery({ ...isAdminQuery, enabled: !!user });
-  const { data: roles } = useQuery({ ...myRolesQuery, enabled: !!user });
-  const isOperator = !!roles?.includes("operator");
+function PlanTripPage() {
+  const { user } = useAuth();
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
 
-  const preset = destinations.find((d) => d.slug === destination);
-  const [destinationSlug, setDestinationSlug] = useState(preset?.slug ?? "");
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
-  const [flexible, setFlexible] = useState(false);
-  const [adults, setAdults] = useState("2");
-  const [children, setChildren] = useState("0");
-  const [budget, setBudget] = useState("");
-  const [accommodation, setAccommodation] = useState("Lodge");
-  const [transport, setTransport] = useState("4x4 safari vehicle");
-  const [luxury, setLuxury] = useState("Mid-range");
-  const [activities, setActivities] = useState<string[]>([]);
-  const [nationality, setNationality] = useState("");
-  const [arrivalAirport, setArrivalAirport] = useState("Nairobi (NBO)");
-  const [pickupLocation, setPickupLocation] = useState("");
-  const [dietary, setDietary] = useState("");
-  const [specialNeeds, setSpecialNeeds] = useState("");
-  const [notes, setNotes] = useState("");
-
-  const mutation = useMutation({
-    mutationFn: async () => {
-      const chosen = destinations.find((d) => d.slug === destinationSlug);
-      const parsed = schema.safeParse({
-        destinationName: chosen?.name ?? "",
-        startDate,
-        endDate,
-        adults: Number(adults),
-        children: Number(children),
-        budget: budget ? Number(budget) : undefined,
-        nationality,
-        arrivalAirport,
-        pickupLocation,
-        dietary,
-        specialNeeds,
-        notes,
-      });
-      if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? "Check the form");
-      const v = parsed.data;
-
-      await api.post("/api/trip-requests", {
-        destinationSlug: chosen!.slug,
-        destinationName: v.destinationName,
-        startDate: v.startDate || undefined,
-        endDate: v.endDate || undefined,
-        flexibleDates: flexible,
-        adults: v.adults,
-        children: v.children,
-        budgetUsd: v.budget ?? undefined,
-        accommodationType: accommodation,
-        transportPreference: transport,
-        luxuryLevel: luxury,
-        activities,
-        nationality: v.nationality || undefined,
-        arrivalAirport: v.arrivalAirport || undefined,
-        pickupLocation: v.pickupLocation || undefined,
-        dietaryRequirements: v.dietary || undefined,
-        specialNeeds: v.specialNeeds || undefined,
-        notes: v.notes || undefined,
-      });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["my-trips"] });
-      toast.success("Trip request sent to Kenyan operators.");
-      navigate({ to: "/my-trips" });
-    },
-    onError: (error) => toast.error(error instanceof Error ? error.message : "Could not save"),
-  });
-
-  if (isAdmin) {
+  // Block operators from accessing this page
+  const isOperator = user?.roles?.includes("operator") || user?.role === "operator";
+  if (isOperator) {
     return (
-      <div className="mx-auto w-full max-w-md px-5 py-20 text-center">
-        <h1 className="text-3xl font-semibold">Admin account</h1>
-        <p className="mt-3 text-muted-foreground">
-          Planning trips is for traveller accounts. Your workspace covers operator approvals and
-          plan settings.
-        </p>
-        <div className="mt-6 flex justify-center gap-3">
-          <Button asChild className="rounded-xl">
-            <Link to="/admin/operators">Approvals</Link>
-          </Button>
-          <Button asChild variant="outline" className="rounded-xl">
-            <Link to="/admin/plans">Plan settings</Link>
+      <div className="min-h-screen bg-background py-28 px-5 text-center">
+        <div className="mx-auto max-w-md rounded-2xl bg-card p-8 shadow-soft">
+          <h1 className="text-2xl font-bold tracking-tight">Access Restricted</h1>
+          <p className="mt-3 text-sm text-muted-foreground">
+            Tour operators cannot create traveller trip requests. Please use your operator dashboard to manage packages and quotes.
+          </p>
+          <Button onClick={() => navigate({ to: "/operator" })} className="mt-6 w-full rounded-xl py-3 font-semibold">
+            Go to Operator Dashboard
           </Button>
         </div>
       </div>
     );
   }
 
-  if (isOperator) {
-    return (
-      <div className="mx-auto w-full max-w-md px-5 py-20 text-center">
-        <h1 className="text-3xl font-semibold">Operator account</h1>
-        <p className="mt-3 text-muted-foreground">
-          Planning trips is for traveller accounts. As an operator, you receive and respond to
-          traveller requests from your dashboard instead.
-        </p>
-        <Button asChild className="mt-6 rounded-xl">
-          <Link to="/operator">Operator dashboard</Link>
-        </Button>
-      </div>
-    );
-  }
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const minDateStr = tomorrow.toISOString().split("T")[0];
 
-  if (!loading && !user) {
-    return (
-      <div className="mx-auto w-full max-w-md px-5 py-20 text-center">
-        <h1 className="text-3xl font-semibold">Sign in to send a request</h1>
-        <p className="mt-3 text-muted-foreground">
-          A free traveller account keeps your requests and incoming quotes together.
-        </p>
-        <Button asChild className="mt-6 rounded-xl">
-          <Link to="/auth" search={{ mode: "signup" }}>
-            Create a free account
-          </Link>
-        </Button>
-      </div>
-    );
-  }
+  const [destinationName, setDestinationName] = useState("Maasai Mara");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [flexibleDates, setFlexibleDates] = useState(false);
+  const [adults, setAdults] = useState(2);
+  const [children, setChildren] = useState(0);
+  const [budget, setBudget] = useState<string>("");
+  const [budgetCurrency, setBudgetCurrency] = useState<"USD" | "KES">("USD");
+  const [luxuryLevel, setLuxuryLevel] = useState("mid-range");
+  const [accommodationType, setAccommodationType] = useState("lodge");
+  const [transportPreference, setTransportPreference] = useState("4x4 Landcruiser");
+  const [nationality, setNationality] = useState("Kenyan / Resident");
+  const [arrivalAirport, setArrivalAirport] = useState("Jomo Kenyatta International Airport (NBO)");
+  const [pickupLocation, setPickupLocation] = useState("Nairobi Hotel / Airport");
+  const [dietaryRequirements, setDietaryRequirements] = useState("None");
+  const [specialNeeds, setSpecialNeeds] = useState("None");
+  const [notes, setNotes] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!user) {
+      toast.error("Please sign in or create a free traveller account to send a trip request");
+      navigate({ to: "/auth", search: { mode: "signup" } });
+      return;
+    }
+
+    if (startDate && startDate < minDateStr) {
+      toast.error("Safaris must be booked starting from tomorrow onwards.");
+      return;
+    }
+
+    const parsed = tripSchema.safeParse({
+      destinationName: destinationName.trim(),
+      startDate: startDate || "",
+      endDate: endDate || "",
+      flexibleDates,
+      adults: Number(adults),
+      children: Number(children),
+      budget: budget ? Number(budget) : 0,
+      budgetCurrency,
+      luxuryLevel,
+      accommodationType,
+      transportPreference,
+      nationality,
+      arrivalAirport: arrivalAirport.trim(),
+      pickupLocation: pickupLocation.trim(),
+      dietaryRequirements: dietaryRequirements.trim(),
+      specialNeeds: specialNeeds.trim(),
+      notes: notes.trim(),
+    });
+
+    if (!parsed.success) {
+      toast.error(parsed.error.issues[0]?.message ?? "Please ensure all fields are correctly filled");
+      return;
+    }
+
+    setBusy(true);
+    try {
+      const payload = {
+        ...parsed.data,
+        budgetUsd: parsed.data.budgetCurrency === "KES" 
+          ? Math.round(parsed.data.budget / 130) 
+          : parsed.data.budget,
+        activities: ["Game Drives", "Sightseeing"],
+      };
+
+      // Use the central api helper which automatically includes Authorization headers
+      await api.post("/api/trip-requests", payload);
+
+      toast.success("Trip request submitted successfully! Local operators can now send you quotes.");
+      navigate({ to: "/my-trips" });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Something went wrong");
+    } finally {
+      setBusy(false);
+    }
+  };
 
   return (
-    <div className="mx-auto w-full max-w-3xl px-5 py-12">
-      <p className="eyebrow text-primary">Trip request</p>
-      <h1 className="mt-2 text-4xl font-semibold">Tell us about your trip</h1>
-      <p className="mt-3 text-muted-foreground">
-        Operators use these details to build a real quotation. Everything except the destination is
-        optional.
-      </p>
+    <div className="min-h-screen bg-background py-16 px-5 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-2xl">
+        
+        {/* Header */}
+        <div className="text-center mb-10">
+          <p className="text-xs font-semibold uppercase tracking-wider text-primary">Tailor-Made Safaris</p>
+          <h1 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">Plan Your Kenyan Adventure</h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            All fields are required. Verified local tour operators will review your details to provide custom competitive quotes.
+          </p>
+        </div>
 
-      <form
-        className="mt-10 space-y-8"
-        onSubmit={(e) => {
-          e.preventDefault();
-          mutation.mutate();
-        }}
-      >
-        <section className="rounded-2xl bg-card p-6 shadow-soft">
-          <h2 className="text-lg font-semibold">Where and when</h2>
-          <div className="mt-5 grid gap-5 sm:grid-cols-2">
-            <div className="space-y-1.5 sm:col-span-2">
-              <Label>Destination</Label>
-              <Select value={destinationSlug} onValueChange={setDestinationSlug}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Choose a destination" />
-                </SelectTrigger>
-                <SelectContent>
-                  {destinations.map((d) => (
-                    <SelectItem key={d.slug} value={d.slug}>
-                      {d.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="start">Arrival</Label>
+        {/* Form Card */}
+        <div className="rounded-2xl bg-card p-6 sm:p-10 shadow-sm border border-border">
+          <form onSubmit={handleSubmit} className="space-y-6">
+            
+            {/* Destination */}
+            <div className="space-y-2">
+              <Label htmlFor="destination" className="flex items-center gap-2 text-foreground font-medium">
+                <MapPin className="size-4 text-primary" /> Destination / National Park *
+              </Label>
               <Input
-                id="start"
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
+                id="destination"
+                value={destinationName}
+                onChange={(e) => setDestinationName(e.target.value)}
+                placeholder="e.g., Maasai Mara, Amboseli, Diani Beach"
+                required
               />
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="end">Departure</Label>
-              <Input
-                id="end"
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-              />
+
+            {/* Dates Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="startDate" className="flex items-center gap-2 text-foreground font-medium">
+                  <Calendar className="size-4 text-primary" /> Estimated Start Date *
+                </Label>
+                <Input
+                  id="startDate"
+                  type="date"
+                  min={minDateStr}
+                  value={startDate}
+                  onChange={(e) => {
+                    const newStart = e.target.value;
+                    setStartDate(newStart);
+                    if (endDate && endDate < newStart) {
+                      setEndDate(newStart);
+                    }
+                  }}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="endDate" className="flex items-center gap-2 text-foreground font-medium">
+                  <Calendar className="size-4 text-primary" /> Estimated End Date *
+                </Label>
+                <Input
+                  id="endDate"
+                  type="date"
+                  min={startDate || minDateStr}
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  required
+                />
+              </div>
             </div>
-            <div className="flex items-center gap-3 sm:col-span-2">
-              <Switch id="flex" checked={flexible} onCheckedChange={setFlexible} />
-              <Label htmlFor="flex" className="font-normal text-muted-foreground">
-                My dates are flexible
+
+            {/* Flexible Dates Checkbox */}
+            <div className="flex items-center gap-2 pt-1">
+              <input
+                type="checkbox"
+                id="flexibleDates"
+                className="size-4 rounded border-input text-primary focus:ring-ring"
+                checked={flexibleDates}
+                onChange={(e) => setFlexibleDates(e.target.checked)}
+              />
+              <Label htmlFor="flexibleDates" className="text-sm font-normal text-muted-foreground cursor-pointer">
+                My dates are flexible (+/- 3 days)
               </Label>
             </div>
-          </div>
-        </section>
 
-        <section className="rounded-2xl bg-card p-6 shadow-soft">
-          <h2 className="text-lg font-semibold">Travellers and budget</h2>
-          <div className="mt-5 grid gap-5 sm:grid-cols-3">
-            <div className="space-y-1.5">
-              <Label htmlFor="adults">Adults</Label>
-              <Input
-                id="adults"
-                type="number"
-                min={1}
-                max={40}
-                value={adults}
-                onChange={(e) => setAdults(e.target.value)}
-              />
+            {/* Travelers Count */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="adults" className="flex items-center gap-2 text-foreground font-medium">
+                  <Users className="size-4 text-primary" /> Adults (12+ yrs) *
+                </Label>
+                <Input
+                  id="adults"
+                  type="number"
+                  min={1}
+                  value={adults}
+                  onChange={(e) => setAdults(Number(e.target.value))}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="children" className="flex items-center gap-2 text-foreground font-medium">
+                  <Users className="size-4 text-primary" /> Children (0-11 yrs) *
+                </Label>
+                <Input
+                  id="children"
+                  type="number"
+                  min={0}
+                  value={children}
+                  onChange={(e) => setChildren(Number(e.target.value))}
+                  required
+                />
+              </div>
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="children">Children</Label>
-              <Input
-                id="children"
-                type="number"
-                min={0}
-                max={40}
-                value={children}
-                onChange={(e) => setChildren(e.target.value)}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="budget">Budget per person (USD)</Label>
-              <Input
-                id="budget"
-                type="number"
-                min={0}
-                value={budget}
-                onChange={(e) => setBudget(e.target.value)}
-                placeholder="1500"
-              />
-            </div>
-          </div>
-        </section>
 
-        <section className="rounded-2xl bg-card p-6 shadow-soft">
-          <h2 className="text-lg font-semibold">Style of trip</h2>
-          <div className="mt-5 grid gap-5 sm:grid-cols-3">
-            <div className="space-y-1.5">
-              <Label>Accommodation</Label>
-              <Select value={accommodation} onValueChange={setAccommodation}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {["Camping", "Tented camp", "Lodge", "Hotel", "Villa", "Luxury camp"].map((o) => (
-                    <SelectItem key={o} value={o}>
-                      {o}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label>Transport</Label>
-              <Select value={transport} onValueChange={setTransport}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {[
-                    "4x4 safari vehicle",
-                    "Safari minivan",
-                    "Private car",
-                    "Domestic flights",
-                    "Self-drive",
-                  ].map((o) => (
-                    <SelectItem key={o} value={o}>
-                      {o}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label>Luxury level</Label>
-              <Select value={luxury} onValueChange={setLuxury}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {["Budget", "Mid-range", "Premium", "Luxury"].map((o) => (
-                    <SelectItem key={o} value={o}>
-                      {o}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <Label className="mt-6 block">Activities</Label>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {ACTIVITIES.map((a) => {
-              const on = activities.includes(a);
-              return (
-                <button
-                  key={a}
-                  type="button"
-                  onClick={() =>
-                    setActivities((prev) =>
-                      prev.includes(a) ? prev.filter((x) => x !== a) : [...prev, a],
-                    )
-                  }
-                  className={cn(
-                    "rounded-full border px-3.5 py-1.5 text-sm font-medium transition-colors",
-                    on
-                      ? "border-primary bg-primary text-primary-foreground"
-                      : "border-border hover:border-primary hover:text-primary",
-                  )}
+            {/* Budget & Currency */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="sm:col-span-2 space-y-2">
+                <Label htmlFor="budget" className="flex items-center gap-2 text-foreground font-medium">
+                  <DollarSign className="size-4 text-primary" /> Approximate Budget *
+                </Label>
+                <Input
+                  id="budget"
+                  type="number"
+                  placeholder="e.g., 2500"
+                  value={budget}
+                  onChange={(e) => setBudget(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="currency" className="text-foreground font-medium">Currency *</Label>
+                <select
+                  id="currency"
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  value={budgetCurrency}
+                  onChange={(e) => setBudgetCurrency(e.target.value as "USD" | "KES")}
+                  required
                 >
-                  {a}
-                </button>
-              );
-            })}
-          </div>
-        </section>
+                  <option value="USD">USD ($)</option>
+                  <option value="KES">KES (Ksh)</option>
+                </select>
+              </div>
+            </div>
 
-        <section className="rounded-2xl bg-card p-6 shadow-soft">
-          <h2 className="text-lg font-semibold">Logistics and notes</h2>
-          <div className="mt-5 grid gap-5 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <Label htmlFor="nationality">Nationality</Label>
-              <Input
-                id="nationality"
-                value={nationality}
-                onChange={(e) => setNationality(e.target.value)}
-                placeholder="German"
-                maxLength={80}
-              />
+            {/* Safari Style & Accommodation */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="luxury" className="flex items-center gap-2 text-foreground font-medium">
+                  <Sparkles className="size-4 text-primary" /> Safari Style *
+                </Label>
+                <select
+                  id="luxury"
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  value={luxuryLevel}
+                  onChange={(e) => setLuxuryLevel(e.target.value)}
+                  required
+                >
+                  <option value="budget">Budget / Camping</option>
+                  <option value="mid-range">Mid-Range Comfort</option>
+                  <option value="luxury">Luxury Lodges & Tented Camps</option>
+                  <option value="ultra-luxury">Ultra-Luxury Exclusive</option>
+                </select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="accommodation" className="flex items-center gap-2 text-foreground font-medium">
+                  <Compass className="size-4 text-primary" /> Preferred Accommodation *
+                </Label>
+                <select
+                  id="accommodation"
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  value={accommodationType}
+                  onChange={(e) => setAccommodationType(e.target.value)}
+                  required
+                >
+                  <option value="lodge">Safari Lodges</option>
+                  <option value="tented-camp">Luxury Tented Camps</option>
+                  <option value="mix">Mix of Both</option>
+                  <option value="hotel-resort">Beach Resorts / Hotels</option>
+                </select>
+              </div>
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="airport">Arrival airport</Label>
-              <Input
-                id="airport"
-                value={arrivalAirport}
-                onChange={(e) => setArrivalAirport(e.target.value)}
-                maxLength={80}
-              />
+
+            {/* Transport & Nationality */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="transport" className="flex items-center gap-2 text-foreground font-medium">
+                  <Car className="size-4 text-primary" /> Transport Preference *
+                </Label>
+                <select
+                  id="transport"
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  value={transportPreference}
+                  onChange={(e) => setTransportPreference(e.target.value)}
+                  required
+                >
+                  <option value="4x4 Landcruiser">4x4 Safari Landcruiser</option>
+                  <option value="Safari Van">Safari Minivan (Tour Van)</option>
+                  <option value="Fly-in Safari">Fly-In Safari (Flight)</option>
+                  <option value="Self Drive">Self Drive</option>
+                </select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="nationality" className="flex items-center gap-2 text-foreground font-medium">
+                  <HeartHandshake className="size-4 text-primary" /> Traveller Status / Residency *
+                </Label>
+                <select
+                  id="nationality"
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  value={nationality}
+                  onChange={(e) => setNationality(e.target.value)}
+                  required
+                >
+                  <option value="Kenyan / Resident">Kenyan Citizen / East African Resident</option>
+                  <option value="Non-Resident">International Non-Resident</option>
+                </select>
+              </div>
             </div>
-            <div className="space-y-1.5 sm:col-span-2">
-              <Label htmlFor="pickup">Pickup location</Label>
-              <Input
-                id="pickup"
-                value={pickupLocation}
-                onChange={(e) => setPickupLocation(e.target.value)}
-                placeholder="Hotel in Nairobi, JKIA, Wilson Airport…"
-                maxLength={120}
-              />
+
+            {/* Airport & Pickup Location */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="airport" className="flex items-center gap-2 text-foreground font-medium">
+                  <Plane className="size-4 text-primary" /> Arrival Airport *
+                </Label>
+                <Input
+                  id="airport"
+                  value={arrivalAirport}
+                  onChange={(e) => setArrivalAirport(e.target.value)}
+                  placeholder="e.g., Jomo Kenyatta (NBO)"
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="pickup" className="flex items-center gap-2 text-foreground font-medium">
+                  <MapPin className="size-4 text-primary" /> Pickup Location *
+                </Label>
+                <Input
+                  id="pickup"
+                  value={pickupLocation}
+                  onChange={(e) => setPickupLocation(e.target.value)}
+                  placeholder="e.g., Nairobi Hotel or Airport Terminal"
+                  required
+                />
+              </div>
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="dietary">Dietary requirements</Label>
-              <Textarea
-                id="dietary"
-                value={dietary}
-                onChange={(e) => setDietary(e.target.value)}
-                maxLength={500}
-                rows={3}
-              />
+
+            {/* Dietary & Special Needs */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="dietary" className="flex items-center gap-2 text-foreground font-medium">
+                  <Utensils className="size-4 text-primary" /> Dietary Requirements *
+                </Label>
+                <Input
+                  id="dietary"
+                  value={dietaryRequirements}
+                  onChange={(e) => setDietaryRequirements(e.target.value)}
+                  placeholder="e.g., Vegetarian, Halal, None"
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="specialNeeds" className="text-foreground font-medium">Special Needs / Mobility *</Label>
+                <Input
+                  id="specialNeeds"
+                  value={specialNeeds}
+                  onChange={(e) => setSpecialNeeds(e.target.value)}
+                  placeholder="e.g., Wheelchair accessibility, None"
+                  required
+                />
+              </div>
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="needs">Accessibility / special needs</Label>
-              <Textarea
-                id="needs"
-                value={specialNeeds}
-                onChange={(e) => setSpecialNeeds(e.target.value)}
-                maxLength={500}
-                rows={3}
-              />
-            </div>
-            <div className="space-y-1.5 sm:col-span-2">
-              <Label htmlFor="notes">Anything else operators should know</Label>
-              <Textarea
+
+            {/* Special Notes */}
+            <div className="space-y-2">
+              <Label htmlFor="notes" className="text-foreground font-medium">Additional Itinerary Notes *</Label>
+              <textarea
                 id="notes"
+                rows={4}
+                className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                placeholder="Mention specific animals you want to see, parks to add, or special requests..."
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
-                maxLength={2000}
-                rows={4}
-                placeholder="We'd love a balloon ride, and prefer lodges with a pool."
+                maxLength={1000}
+                required
               />
             </div>
-          </div>
-        </section>
 
-        <Button
-          type="submit"
-          size="lg"
-          className="w-full rounded-xl"
-          disabled={mutation.isPending || !destinationSlug}
-        >
-          {mutation.isPending ? "Sending…" : "Send trip request"}
-        </Button>
-      </form>
+            <Button type="submit" className="w-full rounded-xl py-3 text-base font-semibold" disabled={busy}>
+              {busy ? "Submitting Request..." : "Submit Trip Request for Quotes"}
+            </Button>
+          </form>
+        </div>
+
+      </div>
     </div>
   );
 }

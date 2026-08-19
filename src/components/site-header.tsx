@@ -1,5 +1,5 @@
 import { Link, useRouter } from "@tanstack/react-router";
-import { Compass, LogOut, Menu, X } from "lucide-react";
+import { LogOut, Menu, X } from "lucide-react";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -7,12 +7,19 @@ import { useAuth } from "@/hooks/useAuth";
 import { isAdminQuery } from "@/lib/plan-queries";
 import { cn } from "@/lib/utils";
 
-const baseLinks = [
+import safariLogo from "@/assets/safari-logo.jpeg";
+
+const customerLinks = [
   { to: "/destinations", label: "Destinations" },
   { to: "/plan-trip", label: "Plan a trip" },
   { to: "/my-trips", label: "My requests" },
-  { to: "/operators", label: "Operators" },
-  { to: "/operator", label: "For operators" },
+];
+
+const guestLinks = [
+  { to: "/destinations", label: "Destinations" },
+  { to: "/plan-trip", label: "Plan a trip" },
+  { to: "/my-trips", label: "My requests" },
+  { to: "/operator", label: "For operators" }, // Only visible to logged-out guests
 ];
 
 export function SiteHeader() {
@@ -21,6 +28,11 @@ export function SiteHeader() {
   const [open, setOpen] = useState(false);
   const { data: isAdmin } = useQuery({ ...isAdminQuery, enabled: !!user });
 
+  // Extract user roles safely to check if they are an operator
+  const userRoles = user?.roles?.map((r: any) => typeof r === 'string' ? r : r.role) || [user?.role];
+  const isOperator = userRoles.includes("operator");
+
+  // Determine links based on exact user role/auth status
   const links = isAdmin
     ? [
         { to: "/destinations", label: "Destinations" },
@@ -28,22 +40,30 @@ export function SiteHeader() {
         { to: "/admin/operators", label: "Approvals" },
         { to: "/admin/plans", label: "Plan settings" },
       ]
-    : baseLinks;
+    : isOperator
+    ? [
+        { to: "/destinations", label: "Destinations" },
+        { to: "/plan-trip", label: "Plan a trip" },
+        { to: "/operator", label: "Operator Dashboard" },
+      ]
+    : user
+    ? customerLinks // Logged-in customers: strictly customer links, NO operator links
+    : guestLinks;   // Logged-out guests: includes "For operators" landing page
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/50 bg-background/75 shadow-[0_4px_30px_rgba(0,0,0,0.04)] backdrop-blur-xl supports-[backdrop-filter]:bg-background/65">
-      <div className="mx-auto flex h-[72px] w-full max-w-7xl items-center gap-4 px-4 sm:px-6 lg:px-8">
+      <div className="mx-auto flex h-[88px] w-full max-w-7xl items-center gap-4 px-4 sm:px-6 lg:px-8">
         {/* Logo + Tagline */}
         <Link
           to="/"
-          className="group flex shrink-0 items-center gap-2.5 rounded-xl outline-none transition-all duration-200 focus-visible:ring-2 focus-visible:ring-primary/50"
+          className="group flex shrink-0 items-center gap-3.5 rounded-xl outline-none transition-all duration-200 focus-visible:ring-2 focus-visible:ring-primary/50"
         >
-          <span className="relative flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-primary via-primary to-primary/75 text-primary-foreground shadow-md shadow-primary/20 transition-all duration-300 group-hover:scale-105 group-hover:shadow-lg group-hover:shadow-primary/25">
-            <span className="absolute inset-0 bg-white/10 opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
-
-            <Compass
-              className="relative size-[21px] transition-transform duration-500 group-hover:rotate-12"
-              strokeWidth={2.2}
+          {/* Circular Frame Container */}
+          <span className="relative flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-primary/20 bg-card shadow-md transition-all duration-300 group-hover:scale-105 group-hover:border-primary/50 group-hover:shadow-lg">
+            <img
+              src={safariLogo} 
+              alt="SafariConnect Kenya Logo"
+              className="h-full w-full object-cover"
             />
           </span>
 

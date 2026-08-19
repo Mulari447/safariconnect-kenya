@@ -1,6 +1,7 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { BadgeCheck, Globe, MapPin, Star } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
 import { operatorDirectoryQuery, type DirectoryOperator } from "@/lib/plan-queries";
 
 export const Route = createFileRoute("/operators")({
@@ -29,6 +30,18 @@ export const Route = createFileRoute("/operators")({
 });
 
 function OperatorsDirectory() {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+
+  // Safely check user roles without risking undefined array crashes
+  const roles = user?.roles ?? [];
+  const isOperator = roles.includes("operator") || user?.role === "operator";
+
+  if (isOperator) {
+    navigate({ to: "/operator" });
+    return null;
+  }
+
   const { data, isLoading } = useQuery(operatorDirectoryQuery);
   const all = data ?? [];
   const featured = all.filter((o) => o.featured_listing);

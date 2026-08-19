@@ -10,10 +10,18 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AdminRouteImport } from './routes/admin'
+import { Route as AdminLoginRouteImport } from './routes/admin-login'
 import { Route as AuthRouteImport } from './routes/auth'
+import { Route as CookiesRouteImport } from './routes/cookies'
 import { Route as MyTripsRouteImport } from './routes/my-trips'
+import { Route as OperatorTermsRouteImport } from './routes/operator-terms'
 import { Route as OperatorsRouteImport } from './routes/operators'
 import { Route as PlanTripRouteImport } from './routes/plan-trip'
+import { Route as PrivacyRouteImport } from './routes/privacy'
+import { Route as RefundPolicyRouteImport } from './routes/refund-policy'
+import { Route as ResetPasswordRouteImport } from './routes/reset-password'
+import { Route as TermsRouteImport } from './routes/terms'
 import { Route as VerifyEmailRouteImport } from './routes/verify-email'
 import { Route as AdminOperatorsRouteImport } from './routes/admin/operators'
 import { Route as AdminPlansRouteImport } from './routes/admin/plans'
@@ -31,14 +39,34 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminLoginRoute = AdminLoginRouteImport.update({
+  id: '/admin-login',
+  path: '/admin-login',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
   path: '/auth',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CookiesRoute = CookiesRouteImport.update({
+  id: '/cookies',
+  path: '/cookies',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const MyTripsRoute = MyTripsRouteImport.update({
   id: '/my-trips',
   path: '/my-trips',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OperatorTermsRoute = OperatorTermsRouteImport.update({
+  id: '/operator-terms',
+  path: '/operator-terms',
   getParentRoute: () => rootRouteImport,
 } as any)
 const OperatorsRoute = OperatorsRouteImport.update({
@@ -51,20 +79,40 @@ const PlanTripRoute = PlanTripRouteImport.update({
   path: '/plan-trip',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PrivacyRoute = PrivacyRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RefundPolicyRoute = RefundPolicyRouteImport.update({
+  id: '/refund-policy',
+  path: '/refund-policy',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ResetPasswordRoute = ResetPasswordRouteImport.update({
+  id: '/reset-password',
+  path: '/reset-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TermsRoute = TermsRouteImport.update({
+  id: '/terms',
+  path: '/terms',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const VerifyEmailRoute = VerifyEmailRouteImport.update({
   id: '/verify-email',
   path: '/verify-email',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminOperatorsRoute = AdminOperatorsRouteImport.update({
-  id: '/admin/operators',
-  path: '/admin/operators',
-  getParentRoute: () => rootRouteImport,
+  id: '/operators',
+  path: '/operators',
+  getParentRoute: () => AdminRoute,
 } as any)
 const AdminPlansRoute = AdminPlansRouteImport.update({
-  id: '/admin/plans',
-  path: '/admin/plans',
-  getParentRoute: () => rootRouteImport,
+  id: '/plans',
+  path: '/plans',
+  getParentRoute: () => AdminRoute,
 } as any)
 const DestinationsIndexRoute = DestinationsIndexRouteImport.update({
   id: '/destinations/',
@@ -110,10 +158,18 @@ const ApiPublicWebhooksIntasendRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRouteWithChildren
+  '/admin-login': typeof AdminLoginRoute
   '/auth': typeof AuthRoute
+  '/cookies': typeof CookiesRoute
   '/my-trips': typeof MyTripsRoute
+  '/operator-terms': typeof OperatorTermsRoute
   '/operators': typeof OperatorsRoute
   '/plan-trip': typeof PlanTripRoute
+  '/privacy': typeof PrivacyRoute
+  '/refund-policy': typeof RefundPolicyRoute
+  '/reset-password': typeof ResetPasswordRoute
+  '/terms': typeof TermsRoute
   '/verify-email': typeof VerifyEmailRoute
   '/admin/operators': typeof AdminOperatorsRoute
   '/admin/plans': typeof AdminPlansRoute
@@ -128,10 +184,18 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRouteWithChildren
+  '/admin-login': typeof AdminLoginRoute
   '/auth': typeof AuthRoute
+  '/cookies': typeof CookiesRoute
   '/my-trips': typeof MyTripsRoute
+  '/operator-terms': typeof OperatorTermsRoute
   '/operators': typeof OperatorsRoute
   '/plan-trip': typeof PlanTripRoute
+  '/privacy': typeof PrivacyRoute
+  '/refund-policy': typeof RefundPolicyRoute
+  '/reset-password': typeof ResetPasswordRoute
+  '/terms': typeof TermsRoute
   '/verify-email': typeof VerifyEmailRoute
   '/admin/operators': typeof AdminOperatorsRoute
   '/admin/plans': typeof AdminPlansRoute
@@ -147,10 +211,18 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/admin': typeof AdminRouteWithChildren
+  '/admin-login': typeof AdminLoginRoute
   '/auth': typeof AuthRoute
+  '/cookies': typeof CookiesRoute
   '/my-trips': typeof MyTripsRoute
+  '/operator-terms': typeof OperatorTermsRoute
   '/operators': typeof OperatorsRoute
   '/plan-trip': typeof PlanTripRoute
+  '/privacy': typeof PrivacyRoute
+  '/refund-policy': typeof RefundPolicyRoute
+  '/reset-password': typeof ResetPasswordRoute
+  '/terms': typeof TermsRoute
   '/verify-email': typeof VerifyEmailRoute
   '/admin/operators': typeof AdminOperatorsRoute
   '/admin/plans': typeof AdminPlansRoute
@@ -167,10 +239,18 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/admin'
+    | '/admin-login'
     | '/auth'
+    | '/cookies'
     | '/my-trips'
+    | '/operator-terms'
     | '/operators'
     | '/plan-trip'
+    | '/privacy'
+    | '/refund-policy'
+    | '/reset-password'
+    | '/terms'
     | '/verify-email'
     | '/admin/operators'
     | '/admin/plans'
@@ -185,10 +265,18 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/admin'
+    | '/admin-login'
     | '/auth'
+    | '/cookies'
     | '/my-trips'
+    | '/operator-terms'
     | '/operators'
     | '/plan-trip'
+    | '/privacy'
+    | '/refund-policy'
+    | '/reset-password'
+    | '/terms'
     | '/verify-email'
     | '/admin/operators'
     | '/admin/plans'
@@ -203,10 +291,18 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/admin'
+    | '/admin-login'
     | '/auth'
+    | '/cookies'
     | '/my-trips'
+    | '/operator-terms'
     | '/operators'
     | '/plan-trip'
+    | '/privacy'
+    | '/refund-policy'
+    | '/reset-password'
+    | '/terms'
     | '/verify-email'
     | '/admin/operators'
     | '/admin/plans'
@@ -222,13 +318,19 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AdminRoute: typeof AdminRouteWithChildren
+  AdminLoginRoute: typeof AdminLoginRoute
   AuthRoute: typeof AuthRoute
+  CookiesRoute: typeof CookiesRoute
   MyTripsRoute: typeof MyTripsRoute
+  OperatorTermsRoute: typeof OperatorTermsRoute
   OperatorsRoute: typeof OperatorsRoute
   PlanTripRoute: typeof PlanTripRoute
+  PrivacyRoute: typeof PrivacyRoute
+  RefundPolicyRoute: typeof RefundPolicyRoute
+  ResetPasswordRoute: typeof ResetPasswordRoute
+  TermsRoute: typeof TermsRoute
   VerifyEmailRoute: typeof VerifyEmailRoute
-  AdminOperatorsRoute: typeof AdminOperatorsRoute
-  AdminPlansRoute: typeof AdminPlansRoute
   DestinationsSlugRoute: typeof DestinationsSlugRoute
   OperatorBillingRoute: typeof OperatorBillingRoute
   OperatorLeadsRoute: typeof OperatorLeadsRoute
@@ -248,6 +350,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin-login': {
+      id: '/admin-login'
+      path: '/admin-login'
+      fullPath: '/admin-login'
+      preLoaderRoute: typeof AdminLoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/auth': {
       id: '/auth'
       path: '/auth'
@@ -255,11 +371,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/cookies': {
+      id: '/cookies'
+      path: '/cookies'
+      fullPath: '/cookies'
+      preLoaderRoute: typeof CookiesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/my-trips': {
       id: '/my-trips'
       path: '/my-trips'
       fullPath: '/my-trips'
       preLoaderRoute: typeof MyTripsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/operator-terms': {
+      id: '/operator-terms'
+      path: '/operator-terms'
+      fullPath: '/operator-terms'
+      preLoaderRoute: typeof OperatorTermsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/operators': {
@@ -276,6 +406,34 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PlanTripRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/privacy': {
+      id: '/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof PrivacyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/refund-policy': {
+      id: '/refund-policy'
+      path: '/refund-policy'
+      fullPath: '/refund-policy'
+      preLoaderRoute: typeof RefundPolicyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reset-password': {
+      id: '/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof ResetPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/terms': {
+      id: '/terms'
+      path: '/terms'
+      fullPath: '/terms'
+      preLoaderRoute: typeof TermsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/verify-email': {
       id: '/verify-email'
       path: '/verify-email'
@@ -285,17 +443,17 @@ declare module '@tanstack/react-router' {
     }
     '/admin/operators': {
       id: '/admin/operators'
-      path: '/admin/operators'
+      path: '/operators'
       fullPath: '/admin/operators'
       preLoaderRoute: typeof AdminOperatorsRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof AdminRoute
     }
     '/admin/plans': {
       id: '/admin/plans'
-      path: '/admin/plans'
+      path: '/plans'
       fullPath: '/admin/plans'
       preLoaderRoute: typeof AdminPlansRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof AdminRoute
     }
     '/destinations/': {
       id: '/destinations/'
@@ -356,15 +514,33 @@ declare module '@tanstack/react-router' {
   }
 }
 
-const rootRouteChildren: RootRouteChildren = {
-  IndexRoute: IndexRoute,
-  AuthRoute: AuthRoute,
-  MyTripsRoute: MyTripsRoute,
-  OperatorsRoute: OperatorsRoute,
-  PlanTripRoute: PlanTripRoute,
-  VerifyEmailRoute: VerifyEmailRoute,
+interface AdminRouteChildren {
+  AdminOperatorsRoute: typeof AdminOperatorsRoute
+  AdminPlansRoute: typeof AdminPlansRoute
+}
+
+const AdminRouteChildren: AdminRouteChildren = {
   AdminOperatorsRoute: AdminOperatorsRoute,
   AdminPlansRoute: AdminPlansRoute,
+}
+
+const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
+
+const rootRouteChildren: RootRouteChildren = {
+  IndexRoute: IndexRoute,
+  AdminRoute: AdminRouteWithChildren,
+  AdminLoginRoute: AdminLoginRoute,
+  AuthRoute: AuthRoute,
+  CookiesRoute: CookiesRoute,
+  MyTripsRoute: MyTripsRoute,
+  OperatorTermsRoute: OperatorTermsRoute,
+  OperatorsRoute: OperatorsRoute,
+  PlanTripRoute: PlanTripRoute,
+  PrivacyRoute: PrivacyRoute,
+  RefundPolicyRoute: RefundPolicyRoute,
+  ResetPasswordRoute: ResetPasswordRoute,
+  TermsRoute: TermsRoute,
+  VerifyEmailRoute: VerifyEmailRoute,
   DestinationsSlugRoute: DestinationsSlugRoute,
   OperatorBillingRoute: OperatorBillingRoute,
   OperatorLeadsRoute: OperatorLeadsRoute,

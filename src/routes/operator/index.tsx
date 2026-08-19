@@ -1,309 +1,248 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
-import { BadgeCheck, Briefcase, Inbox, Lock, Mail, Phone, Users } from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
+import { ArrowLeft, Calendar, DollarSign, MapPin, Users, Upload, FileText, CheckCircle } from "lucide-react";
+import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
+import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
-import {
-  myCompanyQuery,
-  myLeadRequestsQuery,
-  openLeadsQuery,
-  unlockedContactsQuery,
-} from "@/lib/operator-queries";
-import { companyPlanQuery, leadUsageQuery, leadsRemaining } from "@/lib/plan-queries";
-
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { openLeadsQuery, myCompanyQuery, type Lead } from "@/lib/operator-queries";
 
 export const Route = createFileRoute("/operator/")({
-  head: () => ({
-    meta: [
-      { title: "Operator Dashboard — SafariConnect Kenya" },
-      {
-        name: "description",
-        content:
-          "Licensed Kenyan tour operators: manage your company profile, track traveller leads and contact travellers who accepted your request.",
-      },
-      { property: "og:title", content: "Operator Dashboard — SafariConnect Kenya" },
-      {
-        property: "og:description",
-        content: "Manage your company profile and traveller leads on SafariConnect Kenya.",
-      },
-      { property: "og:type", content: "website" },
-      { property: "og:url", content: "/operator" },
-    ],
-    links: [{ rel: "canonical", href: "/operator" }],
-  }),
-  component: OperatorDashboard,
+  component: OperatorLeadsPage,
 });
 
-function OperatorDashboard() {
+function OperatorLeadsPage() {
   const { user, loading } = useAuth();
-  const { data: company, isLoading } = useQuery({ ...myCompanyQuery, enabled: !!user });
-  const { data: requests } = useQuery({
-    ...myLeadRequestsQuery(company?.id),
-    enabled: !!company,
-  });
-  const { data: leads } = useQuery({ ...openLeadsQuery, enabled: !!company });
-  const { data: current } = useQuery({ ...companyPlanQuery(company?.id), enabled: !!company });
-  const plan = current?.plan ?? null;
-  const { data: usedLeads } = useQuery({
-    ...leadUsageQuery(company?.id, current?.subscription?.current_period_start),
-    enabled: !!company && !!current?.subscription,
-  });
-  const { data: contacts } = useQuery({
-    ...unlockedContactsQuery,
-    enabled: !!company && !!plan?.crm_access,
+  const qc = useQueryClient();
+
+  const { data: company } = useQuery({ ...myCompanyQuery, enabled: !!user });
+  const { data: leads, isLoading } = useQuery({ ...openLeadsQuery, enabled: !!company });
+
+  // --- QUOTE & PDF MODAL STATE ---
+  const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+  const [offerAmountKes, setOfferAmountKes] = useState("");
+  const [packageDetails, setPackageDetails] = useState("");
+  const [message, setMessage] = useState("");
+  const [pdfFile, setPdfFile] = useState<File | null>(null);
+
+  const sendQuoteMutation = useMutation({
+    mutationFn: async (formData: FormData) => {
+      return await api.post("/api/leads", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+    },
+    onSuccess: () => {
+      toast.success("Quote and PDF brochure sent successfully to the traveller!");
+      qc.invalidateQueries({ queryKey: ["open-leads"] });
+      setSelectedLead(null);
+      setOfferAmountKes("");
+      setPackageDetails("");
+      setMessage("");
+      setPdfFile(null);
+    },
+    onError: (err: any) => {
+      toast.error(err.response?.data?.error || "Failed to send quote.");
+    },
   });
 
+  const handleSubmitQuote = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedLead) return;
 
-  if (!loading && !user) {
-    return (
-      <Gate
-        title="Operator sign in"
-        body="Sign in with your company account to see traveller leads."
-      />
-    );
-  }
+    const formData = new FormData();
+    formData.append("tripRequestId", selectedLead.id);
+    formData.append("offerAmountKes", offerAmountKes);
+    formData.append("packageDetails", packageDetails);
+    if (message) formData.append("message", message);
+    if (pdfFile) {
+      formData.append("attachment", pdfFile); // Maps directly to multer upload.single('attachment')
+    }
+
+    sendQuoteMutation.mutate(formData);
+  };
 
   if (loading || isLoading) {
-    return <p className="mx-auto max-w-4xl px-5 py-16 text-muted-foreground">Loading…</p>;
+    return <p className="mx-auto max-w-4xl px-5 py-16 text-muted-foreground">Loading open traveller leads...</p>;
   }
 
-  if (!company) {
-    return (
-      <Gate
-        title="Register your tour company"
-        body="Create your company profile to start receiving traveller leads from across Kenya."
-        cta="profile"
-      />
-    );
-  }
-
-  const all = requests ?? [];
-  const accepted = all.filter((r) => r.status === "accepted");
-  const pending = all.filter((r) => r.status === "pending");
-  const leadById = new Map((leads ?? []).map((l) => [l.id, l]));
-  const contactById = new Map((contacts ?? []).map((c) => [c.id, c]));
+  const allLeads = leads ?? [];
 
   return (
     <div className="mx-auto w-full max-w-5xl px-5 py-12">
-      <div className="flex flex-wrap items-end justify-between gap-4">
+      <div className="flex items-center justify-between border-b border-border pb-6">
         <div>
-          <p className="eyebrow text-primary">Operator dashboard</p>
-          <h1 className="mt-2 flex flex-wrap items-center gap-3 text-4xl font-semibold">
-            {company.name}
-            {company.status === "approved" ? (
-              <Badge className="gap-1">
-                <BadgeCheck className="size-3.5" /> Approved
-              </Badge>
-            ) : company.status === "rejected" ? (
-              <Badge variant="destructive">Not approved</Badge>
-            ) : (
-              <Badge variant="secondary">Pending admin approval</Badge>
-            )}
-          </h1>
-        </div>
-        <div className="flex gap-2">
-          <Button asChild variant="outline" className="rounded-xl">
-            <Link to="/operator/profile">Company profile</Link>
+          <Button asChild variant="ghost" size="sm" className="mb-2 -ml-2 text-muted-foreground gap-1.5">
+            <Link to="/operator">
+              <ArrowLeft className="size-4" /> Back to Dashboard
+            </Link>
           </Button>
-          <Button asChild className="rounded-xl">
-            <Link to="/operator/leads">Browse leads</Link>
-          </Button>
-        </div>
-      </div>
-
-      {company.status !== "approved" && (
-        <div className="mt-6 rounded-2xl bg-secondary p-5">
-          <p className="font-semibold">
-            {company.status === "rejected"
-              ? "Your application was not approved"
-              : "Your application is awaiting admin approval"}
-          </p>
+          <h1 className="text-3xl font-bold tracking-tight">Browse Open Traveller Leads</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            {company.admin_note ??
-              "An administrator is verifying your business registration, KRA PIN and TRA licence. Lead access unlocks once approved."}
+            Review custom trip requests submitted by travellers and submit your pricing with a PDF tour brochure.
           </p>
-          <Button asChild variant="outline" className="mt-3 rounded-xl">
-            <Link to="/operator/profile">Review my application</Link>
-          </Button>
         </div>
-      )}
-
-      <div className="mt-8 grid gap-4 sm:grid-cols-3">
-        <Stat icon={<Inbox className="size-4" />} label="Requests sent" value={all.length} />
-        <Stat icon={<Users className="size-4" />} label="Awaiting traveller" value={pending.length} />
-        <Stat
-          icon={<Briefcase className="size-4" />}
-          label="Accepted leads"
-          value={accepted.length}
-        />
       </div>
 
-      <section className="mt-8 rounded-2xl bg-card p-6 shadow-soft">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Current plan
-            </p>
-            <h2 className="mt-1 flex flex-wrap items-center gap-2 text-xl font-semibold">
-              {plan?.name ?? "No plan assigned"}
-              {plan?.premium_badge && (
-                <Badge className="gap-1">
-                  <BadgeCheck className="size-3.5" /> Premium
-                </Badge>
-              )}
-              {plan?.featured_listing && <Badge variant="secondary">Featured listing</Badge>}
-            </h2>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Button asChild variant="outline" className="rounded-xl">
-              <Link to="/operator/subscription">Plan &amp; limits</Link>
-            </Button>
-            <Button asChild className="rounded-xl">
-              <Link to="/operator/billing">Billing &amp; payments</Link>
-            </Button>
-          </div>
-        </div>
-        <div className="mt-4 max-w-md">
-          <p className="text-sm text-muted-foreground">
-            {plan?.lead_limit_monthly == null
-              ? `${usedLeads ?? 0} lead requests sent this month · unlimited`
-              : `${usedLeads ?? 0} of ${plan.lead_limit_monthly} monthly lead requests used`}
-          </p>
-          {plan?.lead_limit_monthly != null && plan.lead_limit_monthly > 0 && (
-            <Progress
-              className="mt-2"
-              value={Math.min(100, Math.round(((usedLeads ?? 0) / plan.lead_limit_monthly) * 100))}
-            />
-          )}
-          {leadsRemaining(plan, usedLeads ?? 0) === 0 && (
-            <p className="mt-2 text-sm font-medium text-destructive">
-              Monthly lead allowance reached — upgrade to keep contacting travellers.
-            </p>
-          )}
-        </div>
-      </section>
-
-      <h2 className="mt-12 text-2xl font-semibold">Your contactable leads</h2>
-      <p className="mt-1 text-sm text-muted-foreground">
-        Contact details appear only after the traveller accepts your request.
-      </p>
-
-      {!plan?.crm_access ? (
-        <div className="mt-6 rounded-2xl bg-card p-8 text-center shadow-soft">
-          <Lock className="mx-auto size-5 text-muted-foreground" />
-          <p className="mt-3 font-semibold">CRM access is not included in {plan?.name ?? "your plan"}</p>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Upgrade to store traveller contacts, phone numbers and WhatsApp links in your operator
-            CRM.
-          </p>
-          <Button asChild className="mt-5 rounded-xl">
-            <Link to="/operator/subscription">See plans</Link>
-          </Button>
-        </div>
-      ) : accepted.length === 0 ? (
-
-        <div className="mt-6 rounded-2xl bg-card p-8 text-center shadow-soft">
-          <p className="font-semibold">No accepted leads yet</p>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Browse open trip requests and introduce your company — travellers who accept unlock
-            their phone and email for you.
-          </p>
-          <Button asChild className="mt-5 rounded-xl">
-            <Link to="/operator/leads">Browse open leads</Link>
-          </Button>
+      {allLeads.length === 0 ? (
+        <div className="mt-12 rounded-2xl border border-border bg-card p-12 text-center shadow-sm">
+          <h3 className="text-lg font-semibold">No open leads right now</h3>
+          <p className="mt-2 text-sm text-muted-foreground">Check back later when travellers submit new itineraries.</p>
         </div>
       ) : (
-        <ul className="mt-6 space-y-4">
-          {accepted.map((r) => {
-            const lead = leadById.get(r.trip_request_id);
-            const contact = contactById.get(r.traveller_id);
-            return (
-              <li key={r.id} className="rounded-2xl bg-card p-6 shadow-soft">
-                <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="mt-8 grid gap-6">
+          {allLeads.map((lead) => (
+            <div key={lead.id} className="rounded-2xl border border-border bg-card p-6 shadow-sm flex flex-col justify-between space-y-4">
+              <div className="space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <h3 className="text-xl font-bold flex items-center gap-2">
+                    <MapPin className="size-5 text-primary" /> {lead.destination_name}
+                  </h3>
+                  <span className="text-xs text-muted-foreground">Requested {new Date(lead.created_at).toLocaleDateString()}</span>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm bg-muted/40 p-4 rounded-xl border border-border">
                   <div>
-                    <h3 className="text-lg font-semibold">
-                      {lead?.destination_name ?? "Trip request"}
-                    </h3>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      {contact?.full_name || "Traveller"}
-                      {contact?.country ? ` · ${contact.country}` : ""}
-                      {contact?.preferred_language ? ` · ${contact.preferred_language}` : ""}
-                    </p>
+                    <span className="text-xs text-muted-foreground uppercase block font-semibold flex items-center gap-1"><Calendar className="size-3" /> Dates</span>
+                    <span className="font-medium">{lead.start_date ? new Date(lead.start_date).toLocaleDateString() : "Flexible"}</span>
                   </div>
-                  <Badge>Accepted</Badge>
+                  <div>
+                    <span className="text-xs text-muted-foreground uppercase block font-semibold flex items-center gap-1"><Users className="size-3" /> Travelers</span>
+                    <span className="font-medium">{lead.adults} Adults, {lead.children || 0} Kids</span>
+                  </div>
+                  <div>
+                    <span className="text-xs text-muted-foreground uppercase block font-semibold flex items-center gap-1"><DollarSign className="size-3" /> Budget</span>
+                    <span className="font-medium">{lead.budget_usd ? `USD ${lead.budget_usd.toLocaleString()}` : "Not specified"}</span>
+                  </div>
+                  <div>
+                    <span className="text-xs text-muted-foreground uppercase block font-semibold">Transport</span>
+                    <span className="font-medium capitalize">{lead.transport_preference || "Standard"}</span>
+                  </div>
                 </div>
-                <div className="mt-4 flex flex-wrap gap-3 text-sm">
-                  {contact?.phone && (
-                    <a
-                      href={`tel:${contact.phone}`}
-                      className="flex items-center gap-1.5 rounded-full bg-secondary px-3 py-1.5 font-medium"
-                    >
-                      <Phone className="size-4" /> {contact.phone}
-                    </a>
-                  )}
-                  <a
-                    href={`https://wa.me/${(contact?.phone ?? "").replace(/[^0-9]/g, "")}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="flex items-center gap-1.5 rounded-full bg-secondary px-3 py-1.5 font-medium"
-                  >
-                    <Mail className="size-4" /> WhatsApp
-                  </a>
-                </div>
-                {lead?.notes && (
-                  <p className="mt-4 text-sm text-muted-foreground">{lead.notes}</p>
+
+                {lead.notes && (
+                  <p className="text-sm text-muted-foreground bg-muted/20 p-4 rounded-xl italic">
+                    "{lead.notes}"
+                  </p>
                 )}
-              </li>
-            );
-          })}
-        </ul>
+              </div>
+
+              <div className="flex justify-end pt-2 border-t border-border/60">
+                <Button onClick={() => setSelectedLead(lead)} className="rounded-xl gap-2 font-semibold">
+                  Send Quote & PDF Brochure
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* --- QUOTE & PDF UPLOAD MODAL --- */}
+      {selectedLead && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl bg-card p-6 shadow-2xl border border-border space-y-6">
+            
+            <div className="flex items-center justify-between border-b border-border pb-4">
+              <div>
+                <h3 className="text-xl font-bold">Send Quote: {selectedLead.destination_name}</h3>
+                <p className="text-xs text-muted-foreground">Provide your pricing, itinerary details, and company PDF brochure.</p>
+              </div>
+              <button onClick={() => setSelectedLead(null)} className="text-muted-foreground hover:text-foreground text-sm font-bold px-3 py-1 rounded-lg bg-muted">
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmitQuote} className="space-y-4">
+              <div>
+                <Label htmlFor="amount">Offer Amount (KES) *</Label>
+                <Input
+                  id="amount"
+                  type="number"
+                  placeholder="e.g. 75000"
+                  value={offerAmountKes}
+                  onChange={(e) => setOfferAmountKes(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="details">Package Details & Itinerary *</Label>
+                <Textarea
+                  id="details"
+                  rows={4}
+                  placeholder="Describe accommodation, game drives, meals, park fees included..."
+                  value={packageDetails}
+                  onChange={(e) => setPackageDetails(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="message">Personal Note to Traveller (Optional)</Label>
+                <Input
+                  id="message"
+                  placeholder="e.g. We look forward to hosting you on this amazing safari!"
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                />
+              </div>
+
+              {/* PDF Uploader */}
+              <div className="space-y-2">
+                <Label>Attach Company PDF / Tour Package Brochure (Optional)</Label>
+                
+                {!pdfFile ? (
+                  <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border bg-muted/30 p-6 text-center hover:bg-muted/50 transition-colors">
+                    <Upload className="size-6 text-muted-foreground" />
+                    <span className="text-sm font-medium text-foreground">Click to upload PDF package / brochure</span>
+                    <span className="text-xs text-muted-foreground">Maximum file size: 10MB (.pdf)</span>
+                    <input
+                      type="file"
+                      accept="application/pdf"
+                      className="hidden"
+                      onChange={(e) => {
+                        if (e.target.files && e.target.files[0]) {
+                          setPdfFile(e.target.files[0]);
+                        }
+                      }}
+                    />
+                  </label>
+                ) : (
+                  <div className="flex items-center justify-between rounded-xl border border-primary/30 bg-primary/5 p-4">
+                    <div className="flex items-center gap-3">
+                      <FileText className="size-5 text-primary" />
+                      <div>
+                        <p className="text-sm font-medium text-foreground">{pdfFile.name}</p>
+                        <p className="text-xs text-muted-foreground">{(pdfFile.size / (1024 * 1024)).toFixed(2)} MB</p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setPdfFile(null)}
+                      className="text-xs text-destructive hover:underline font-semibold"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex justify-end gap-3 border-t border-border pt-4">
+                <Button type="button" variant="outline" onClick={() => setSelectedLead(null)} className="rounded-xl">
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={sendQuoteMutation.isPending} className="rounded-xl gap-2 font-semibold">
+                  {sendQuoteMutation.isPending ? "Sending Quote & PDF..." : "Submit Quote & Brochure"}
+                </Button>
+              </div>
+            </form>
+
+          </div>
+        </div>
       )}
     </div>
   );
 }
-
-function Stat({
-  icon,
-  label,
-  value,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: number;
-}) {
-  return (
-    <div className="rounded-2xl bg-card p-5 shadow-soft">
-      <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-        {icon} {label}
-      </p>
-      <p className="mt-2 text-3xl font-semibold">{value}</p>
-    </div>
-  );
-}
-
-function Gate({
-  title,
-  body,
-  cta,
-}: {
-  title: string;
-  body: string;
-  cta?: "profile";
-}) {
-  return (
-    <div className="mx-auto w-full max-w-md px-5 py-20 text-center">
-      <h1 className="text-3xl font-semibold">{title}</h1>
-      <p className="mt-3 text-muted-foreground">{body}</p>
-      <Button asChild className="mt-6 rounded-xl">
-        {cta === "profile" ? (
-          <Link to="/operator/profile">Register company</Link>
-        ) : (
-          <Link to="/auth">Sign in</Link>
-        )}
-      </Button>
-    </div>
-  );
-}
-

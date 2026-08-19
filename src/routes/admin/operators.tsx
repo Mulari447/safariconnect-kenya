@@ -9,22 +9,18 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { allCompaniesQuery, type OperatorCompany } from "@/lib/operator-queries";
 import { isAdminQuery } from "@/lib/plan-queries";
+import { ShieldAlert, UserCheck, UserX } from "lucide-react";
 
 export const Route = createFileRoute("/admin/operators")({
   head: () => ({
     meta: [
-      { title: "Operator Approvals — SafariConnect Kenya Admin" },
+      { title: "Operator Approvals & Management — SafariConnect Kenya Admin" },
       {
         name: "description",
         content:
-          "Review pending Kenyan tour operator applications: business registration, KRA PIN, TRA licence and contacts, then approve or reject each company.",
+          "Review pending Kenyan tour operator applications and manage active operator suspensions.",
       },
-      { property: "og:title", content: "Operator Approvals — SafariConnect Kenya Admin" },
-      {
-        property: "og:description",
-        content: "Approve or reject tour operator registrations on SafariConnect Kenya.",
-      },
-      { property: "og:type", content: "website" },
+      { property: "og:title", content: "Operator Approvals & Management — SafariConnect Kenya Admin" },
     ],
   }),
   component: AdminOperators,
@@ -50,9 +46,9 @@ function AdminOperators() {
       <div className="mx-auto w-full max-w-md px-5 py-20 text-center">
         <h1 className="text-3xl font-semibold">Admins only</h1>
         <p className="mt-3 text-muted-foreground">
-          Operator approvals are restricted to the SafariConnect administrator.
+          Operator management is restricted to SafariConnect administrators.
         </p>
-        <Button asChild className="mt-6 rounded-xl">
+        <Button asChild className="mt-6 rounded-lg">
           <Link to="/">Back to marketplace</Link>
         </Button>
       </div>
@@ -76,16 +72,37 @@ function AdminOperators() {
     }
   };
 
+  const handleSuspend = async (ownerId: string, type: 'temporary' | 'permanent' | 'lift', days?: number) => {
+    setBusyId(ownerId);
+    try {
+      await api.patch(`/api/admin/users/${ownerId}/suspend`, {
+        suspensionType: type,
+        durationDays: days,
+      });
+      toast.success(
+        type === 'lift' 
+          ? "Operator suspension lifted." 
+          : type === 'temporary' 
+          ? `Operator suspended for ${days} days.` 
+          : "Operator permanently suspended."
+      );
+      await qc.invalidateQueries({ queryKey: ["all-companies"] });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to update suspension status");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   const all = companies ?? [];
   const shown = all.filter((c) => c.status === filter);
 
   return (
     <div className="mx-auto w-full max-w-4xl px-5 py-12">
-      <p className="eyebrow text-primary">Administration</p>
-      <h1 className="mt-2 text-4xl font-semibold">Operator approvals</h1>
-      <p className="mt-3 max-w-xl text-muted-foreground">
-        Every tour company stays pending until you approve it. Approved companies appear in the
-        public directory and unlock the lead marketplace.
+      <p className="text-xs font-semibold uppercase tracking-wider text-primary">Administration</p>
+      <h1 className="mt-2 text-3xl font-bold tracking-tight">Operator management</h1>
+      <p className="mt-2 max-w-xl text-sm text-muted-foreground">
+        Review submitted registration details, licensing, and credentials below. Manage active operator approvals and account suspensions.
       </p>
 
       <div className="mt-8 flex flex-wrap gap-2">
@@ -94,7 +111,7 @@ function AdminOperators() {
             key={f}
             size="sm"
             variant={filter === f ? "default" : "outline"}
-            className="rounded-full capitalize"
+            className="rounded-lg capitalize text-xs"
             onClick={() => setFilter(f)}
           >
             {f} ({all.filter((c) => c.status === f).length})
@@ -105,77 +122,156 @@ function AdminOperators() {
       {isLoading ? (
         <p className="mt-10 text-muted-foreground">Loading applications…</p>
       ) : shown.length === 0 ? (
-        <div className="mt-8 rounded-2xl bg-card p-10 text-center shadow-soft">
-          <p className="font-semibold">No {filter} applications</p>
+        <div className="mt-8 rounded-xl border border-border bg-card p-10 text-center shadow-sm">
+          <p className="text-sm font-medium text-foreground">No {filter} applications found</p>
         </div>
       ) : (
-        <div className="mt-6 space-y-5">
-          {shown.map((c) => (
-            <article key={c.id} className="rounded-2xl bg-card p-6 shadow-soft">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <h2 className="text-xl font-semibold">{c.name}</h2>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    {c.county ?? "County not set"} · {c.physical_address ?? "No address"}
-                  </p>
+        <div className="mt-6 space-y-6">
+          {shown.map((c) => {
+            const ownerUser = (c as any).owner;
+            const isSuspended = ownerUser?.suspended;
+            const suspendedUntil = ownerUser?.suspendedUntil;
+
+            return (
+              <article key={c.id} className="rounded-xl border border-border bg-card p-6 shadow-sm space-y-5">
+                <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border pb-4">
+                  <div>
+                    <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
+                      {c.name}
+                      {isSuspended && (
+                        <Badge variant="destructive" className="text-[10px]">
+                          {suspendedUntil ? `Suspended until ${new Date(suspendedUntil).toLocaleDateString()}` : "Banned"}
+                        </Badge>
+                      )}
+                    </h2>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      County: {c.county ?? "Not set"} · Physical Address: {c.physical_address ?? "Not provided"}
+                    </p>
+                  </div>
+                  <Badge variant={c.status === "approved" ? "default" : c.status === "rejected" ? "destructive" : "secondary"}>
+                    {c.status}
+                  </Badge>
                 </div>
-                <Badge variant={c.status === "approved" ? "default" : "secondary"}>
-                  {c.status}
-                </Badge>
-              </div>
 
-              <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
-                <Row label="Business reg. no." value={c.business_reg_number} />
-                <Row label="KRA PIN" value={c.kra_pin} />
-                <Row label="TRA licence" value={c.license_number} />
-                <Row label="KATO membership" value={c.kato_membership} />
-                <Row label="Contact person" value={c.contact_person} />
-                <Row label="Email" value={c.email} />
-                <Row label="Phone" value={c.phone} />
-                <Row label="WhatsApp" value={c.whatsapp} />
-                <Row label="Website" value={c.website} />
-                <Row label="Google Maps" value={c.maps_url} />
-                <Row
-                  label="Years in business"
-                  value={c.years_in_business == null ? null : String(c.years_in_business)}
-                />
-                <Row label="Employees" value={c.employees == null ? null : String(c.employees)} />
-                <Row label="Languages" value={c.languages.join(", ") || null} />
-                <Row label="Vehicles" value={c.vehicle_types.join(", ") || null} />
-                <Row label="Specialties" value={c.safari_specialties.join(", ") || null} />
-                <Row label="Tour categories" value={c.tour_categories.join(", ") || null} />
-              </dl>
+                {/* STRUCTURED SUBMITTED INFO GRID */}
+                <div>
+                  <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-3">Submitted Business Credentials</h3>
+                  <dl className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 bg-muted/40 p-4 rounded-lg border border-border text-sm">
+                    <Row label="Business Reg. No." value={c.business_reg_number} />
+                    <Row label="KRA PIN" value={c.kra_pin} />
+                    <Row label="Tourism Licence No." value={c.license_number} />
+                    <Row label="KATO Membership" value={c.kato_membership} />
+                    <Row label="Contact Person" value={c.contact_person} />
+                    <Row label="Business Email" value={c.email} />
+                    <Row label="Business Phone" value={c.phone} />
+                    <Row label="WhatsApp Number" value={c.whatsapp} />
+                    <Row label="Website URL" value={c.website} />
+                    <Row label="Google Maps URL" value={c.maps_url} />
+                    <Row label="Years in Business" value={c.years_in_business == null ? null : String(c.years_in_business)} />
+                    <Row label="Number of Employees" value={c.employees == null ? null : String(c.employees)} />
+                  </dl>
+                </div>
 
-              {c.description && <p className="mt-4 text-sm">{c.description}</p>}
+                {(c.languages?.length > 0 || c.vehicle_types?.length > 0 || c.safari_specialties?.length > 0 || c.tour_categories?.length > 0) && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-t border-border pt-4 text-sm">
+                    <Row label="Languages Spoken" value={c.languages?.join(", ") || null} />
+                    <Row label="Vehicle Types" value={c.vehicle_types?.join(", ") || null} />
+                    <Row label="Safari Specialties" value={c.safari_specialties?.join(", ") || null} />
+                    <Row label="Tour Categories" value={c.tour_categories?.join(", ") || null} />
+                  </div>
+                )}
 
-              <Textarea
-                className="mt-4"
-                rows={2}
-                maxLength={500}
-                placeholder="Note to the operator (optional)"
-                value={notes[c.id] ?? c.admin_note ?? ""}
-                onChange={(e) => setNotes((n) => ({ ...n, [c.id]: e.target.value }))}
-              />
+                {c.description && (
+                  <div className="border-t border-border pt-4">
+                    <dt className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-1">Company Overview / Description</dt>
+                    <dd className="text-sm text-muted-foreground bg-background p-3 rounded-lg border border-border whitespace-pre-wrap">{c.description}</dd>
+                  </div>
+                )}
 
-              <div className="mt-4 flex flex-wrap gap-2">
-                <Button
-                  className="rounded-xl"
-                  disabled={busyId === c.id || c.status === "approved"}
-                  onClick={() => void decide(c, "approved")}
-                >
-                  Approve
-                </Button>
-                <Button
-                  variant="outline"
-                  className="rounded-xl"
-                  disabled={busyId === c.id || c.status === "rejected"}
-                  onClick={() => void decide(c, "rejected")}
-                >
-                  Reject
-                </Button>
-              </div>
-            </article>
-          ))}
+                <div className="border-t border-border pt-4">
+                  <label className="block text-xs font-medium uppercase tracking-wider text-muted-foreground mb-1.5">
+                    Admin Feedback Note (sent to operator)
+                  </label>
+                  <Textarea
+                    className="rounded-lg border-input text-sm"
+                    rows={2}
+                    maxLength={500}
+                    placeholder="Optional review notes or rejection reasons..."
+                    value={notes[c.id] ?? c.admin_note ?? ""}
+                    onChange={(e) => setNotes((n) => ({ ...n, [c.id]: e.target.value }))}
+                  />
+                </div>
+
+                <div className="border-t border-border pt-4 flex flex-wrap gap-2.5 justify-between items-center">
+                  {/* SUSPENSION CONTROLS FOR APPROVED OPERATORS */}
+                  <div className="flex items-center gap-2">
+                    {c.status === "approved" && ownerUser?.id && (
+                      isSuspended ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={busyId === ownerUser.id}
+                          onClick={() => void handleSuspend(ownerUser.id, 'lift')}
+                          className="text-green-600 border-green-200 hover:bg-green-50 rounded-lg text-xs"
+                        >
+                          <UserCheck className="size-4 mr-1" /> Lift Suspension
+                        </Button>
+                      ) : (
+                        <>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={busyId === ownerUser.id}
+                            onClick={() => {
+                              const days = prompt("Enter temporary suspension duration in days (e.g., 7):");
+                              if (days) void handleSuspend(ownerUser.id, 'temporary', parseInt(days, 10));
+                            }}
+                            className="text-amber-600 border-amber-200 hover:bg-amber-50 rounded-lg text-xs"
+                          >
+                            <ShieldAlert className="size-4 mr-1" /> Temp Suspend
+                          </Button>
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            disabled={busyId === ownerUser.id}
+                            onClick={() => {
+                              if (confirm("Are you sure you want to permanently suspend this operator?")) {
+                                void handleSuspend(ownerUser.id, 'permanent');
+                              }
+                            }}
+                            className="rounded-lg text-xs"
+                          >
+                            <UserX className="size-4 mr-1" /> Permanent Ban
+                          </Button>
+                        </>
+                      )
+                    )}
+                  </div>
+
+                  {/* APPROVAL / REJECTION ACTIONS */}
+                  <div className="flex flex-wrap gap-2.5 ml-auto">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="rounded-lg"
+                      disabled={busyId === c.id || c.status === "rejected"}
+                      onClick={() => void decide(c, "rejected")}
+                    >
+                      Reject Application
+                    </Button>
+                    <Button
+                      size="sm"
+                      className="rounded-lg"
+                      disabled={busyId === c.id || c.status === "approved"}
+                      onClick={() => void decide(c, "approved")}
+                    >
+                      Approve &amp; Verify Operator
+                    </Button>
+                  </div>
+                </div>
+              </article>
+            );
+          })}
         </div>
       )}
     </div>
@@ -185,8 +281,8 @@ function AdminOperators() {
 function Row({ label, value }: { label: string; value: string | null }) {
   return (
     <div>
-      <dt className="text-xs uppercase tracking-wider text-muted-foreground">{label}</dt>
-      <dd className="mt-0.5 break-words">{value ?? "—"}</dd>
+      <dt className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{label}</dt>
+      <dd className="mt-0.5 text-sm font-medium text-foreground break-words">{value ?? "—"}</dd>
     </div>
   );
 }

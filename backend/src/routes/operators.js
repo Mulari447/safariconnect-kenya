@@ -74,10 +74,7 @@ router.get('/directory/:slug', async (req, res, next) => {
   }
 });
 
-// --- IMPORTANT: /admin routes must come BEFORE /:something wildcard-like routes ---
-// (none of those exist here currently, but keeping /admin high up avoids future collisions)
-
-// GET /api/operators/admin?status=pending|approved|rejected — admin lists companies (defaults to all)
+// GET /api/operators/admin?status=pending|approved|rejected — admin lists companies
 router.get('/admin', requireAuth, requireRole('admin'), async (req, res, next) => {
   try {
     const { status } = req.query;
@@ -91,7 +88,6 @@ router.get('/admin', requireAuth, requireRole('admin'), async (req, res, next) =
   }
 });
 
-// Kept for backward compatibility — same as /admin?status=pending
 router.get('/admin/pending', requireAuth, requireRole('admin'), async (req, res, next) => {
   try {
     const companies = await prisma.operatorCompany.findMany({
@@ -104,7 +100,6 @@ router.get('/admin/pending', requireAuth, requireRole('admin'), async (req, res,
   }
 });
 
-// PATCH /api/operators/admin/:id/approve — admin approves an operator
 router.patch('/admin/:id/approve', requireAuth, requireRole('admin'), async (req, res, next) => {
   try {
     const { adminNote } = req.body;
@@ -123,7 +118,6 @@ router.patch('/admin/:id/approve', requireAuth, requireRole('admin'), async (req
   }
 });
 
-// PATCH /api/operators/admin/:id/reject — admin rejects an operator
 router.patch('/admin/:id/reject', requireAuth, requireRole('admin'), async (req, res, next) => {
   try {
     const { adminNote } = req.body;
@@ -137,7 +131,7 @@ router.patch('/admin/:id/reject', requireAuth, requireRole('admin'), async (req,
   }
 });
 
-// POST /api/operators — register a company (user becomes its owner + gets 'operator' role)
+// POST /api/operators — register a company
 router.post('/', requireAuth, async (req, res, next) => {
   try {
     const data = companySchema.parse(req.body);
@@ -185,7 +179,6 @@ router.post('/', requireAuth, async (req, res, next) => {
         },
       });
 
-      // Self-assign the operator role, same as the old Supabase policy allowed
       await tx.userRole.upsert({
         where: { userId_role: { userId: req.user.id, role: 'operator' } },
         update: {},
@@ -238,6 +231,26 @@ router.patch('/me', requireAuth, async (req, res, next) => {
     }
     next(err);
   }
+});
+
+// --- COMPATIBILITY ALIAS ROUTES FOR /api/operator/my-company ---
+
+router.get('/my-company', requireAuth, async (req, res, next) => {
+  try {
+    const company = await prisma.operatorCompany.findUnique({
+      where: { ownerId: req.user.id },
+      include: { subscription: { include: { plan: true } } },
+    });
+    if (!company) return res.status(404).json({ error: 'No company registered yet' });
+    res.json(company);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/my-company', requireAuth, async (req, res, next) => {
+  req.url = '/';
+  return router.handle(req, res, next);
 });
 
 module.exports = router;

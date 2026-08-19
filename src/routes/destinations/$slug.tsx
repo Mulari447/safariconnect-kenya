@@ -15,10 +15,10 @@ export const Route = createFileRoute("/destinations/$slug")({
   },
   head: ({ params, loaderData }) => ({
     meta: [
-      { title: `${loaderData?.name ?? "Destination"} — Kenya Travel Guide | SafariConnect` },
-      { name: "description", content: loaderData?.summary ?? "Kenyan destination guide." },
-      { property: "og:title", content: `${loaderData?.name ?? "Destination"} | SafariConnect Kenya` },
-      { property: "og:description", content: loaderData?.summary ?? "Kenyan destination guide." },
+      { title: `${loaderData?.name ?? "Destination"} Safari Guide | SafariConnect Kenya` },
+      { name: "description", content: loaderData?.summary ?? "Kenyan destination guide and custom holiday packages." },
+      { property: "og:title", content: `${loaderData?.name ?? "Destination"} Safari Guide | SafariConnect Kenya` },
+      { property: "og:description", content: loaderData?.summary ?? "Kenyan destination guide and custom holiday packages." },
       { property: "og:type", content: "article" },
       { property: "og:url", content: `/destinations/${params.slug}` },
     ],
@@ -127,4 +127,3 @@ function DestinationPage() {
     </article>
   );
 }
-

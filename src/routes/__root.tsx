@@ -81,7 +81,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "SafariConnect Kenya — Compare Safari Quotes from Kenyan Operators" },
+      { title: "SafariConnect Kenya" },
       {
         name: "description",
         content:
@@ -90,8 +90,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { property: "og:site_name", content: "SafariConnect Kenya" },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
-      { property: "og:title", content: "SafariConnect Kenya — Compare Safari Quotes from Kenyan Operators" },
-      { name: "twitter:title", content: "SafariConnect Kenya — Compare Safari Quotes from Kenyan Operators" },
+      { property: "og:title", content: "SafariConnect Kenya" },
+      { name: "twitter:title", content: "SafariConnect Kenya" },
       { property: "og:description", content: "Tell us your trip once and licensed Kenyan tour operators send you quotes. Maasai Mara, Amboseli, Diani, Mount Kenya and more. Free for travellers." },
       { name: "twitter:description", content: "Tell us your trip once and licensed Kenyan tour operators send you quotes. Maasai Mara, Amboseli, Diani, Mount Kenya and more. Free for travellers." },
       { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/e981a088-4db3-4f2f-8429-ad3fa5b14953/id-preview-e6347819--b2ecc521-5c21-4dd3-9f7b-c66628b51c1f.lovable.app-1786045855209.png" },

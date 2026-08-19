@@ -33,9 +33,23 @@ function VerifyEmailPage() {
     ran.current = true;
 
     verifyEmail(token)
-      .then(() => {
+      .then((res: any) => {
         setStatus("success");
-        setTimeout(() => navigate({ to: "/my-trips" }), 2000);
+        
+        // Dynamically check user role from the verification response
+        const userRoles = res?.user?.roles?.map((r: any) => typeof r === 'string' ? r : r.role) || [res?.user?.role];
+        const isAdmin = userRoles.includes("admin");
+        const isOperator = userRoles.includes("operator");
+
+        setTimeout(() => {
+          if (isAdmin) {
+            window.location.href = "/admin";
+          } else if (isOperator) {
+            window.location.href = "/operator"; // Routes operators to their dashboard!
+          } else {
+            navigate({ to: "/my-trips" });
+          }
+        }, 2000);
       })
       .catch((err) => {
         setStatus("error");
