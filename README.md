@@ -25,8 +25,7 @@ The platform owner (Super Admin) verifies operators, configures pricing and lead
 8. [Project structure](#project-structure)
 9. [Scripts](#scripts)
 10. [Deployment](#deployment)
-11. [Collaboration workflow](#collaboration-workflow)
-12. [Roadmap](#roadmap)
+11. [Roadmap](#roadmap)
 
 ---
 
@@ -248,7 +247,6 @@ Target: Docker + Nginx on a Linux server, HTTPS enabled, daily database backups.
 - Production uses live IntaSend keys and the production SMTP account.
 - Security checklist: HTTPS, role-based permissions, optional 2FA, rate limiting, CAPTCHA, encrypted sensitive data, audit logs, session management.
 
-
 ## Roadmap
 
 Architecture is kept modular to support: hotels, airlines, travel insurance, car / boat hire, helicopter tours, event, conference, medical and volunteer tourism, travel agents, affiliate / referral / loyalty programs, mobile apps, AI trip planner and chat assistant, dynamic pricing, multi-language (Swahili next), and expansion to Uganda, Tanzania, Rwanda and Ethiopia.
@@ -256,5 +254,3 @@ Architecture is kept modular to support: hotels, airlines, travel insurance, car
 ## Non-functional goals
 
 Modular codebase, documented REST APIs, structured logging and error handling, unit and integration tests, caching, lazy-loaded optimized images, dark / light mode, WCAG-friendly accessibility, SEO (clean URLs, meta tags, schema markup, Open Graph, sitemap, robots.txt).
-
----
