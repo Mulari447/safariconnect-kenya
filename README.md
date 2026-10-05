@@ -23,7 +23,7 @@ The platform owner (Super Admin) verifies operators, configures pricing and lead
 6. [Getting started](#getting-started)
 7. [Environment variables](#environment-variables)
 8. [Project structure](#project-structure)
-9. [Scripts](#scripts)
+9. [Commands](#commands)
 10. [Deployment](#deployment)
 11. [Roadmap](#roadmap)
 
@@ -34,25 +34,26 @@ The platform owner (Super Admin) verifies operators, configures pricing and lead
 | Layer | Technology |
 |---|---|
 | Frontend | TanStack Start, React 19, Vite, TypeScript, Tailwind CSS, shadcn/ui (Radix) |
-| Backend | Node.js, Express, Prisma ORM |
+| Backend | PHP 8.2+, Laravel (REST API) |
 | Database | MySQL (database name: `safariconnect`) |
 | Auth | JWT, with Google / email / phone OTP for customers |
 | Payments | M-Pesa STK Push via IntaSend; card payments (Visa / Mastercard) |
-| Email | SMTP via Nodemailer |
+| Email | SMTP (Laravel Mail) |
 | SMS | Africa's Talking |
 | Maps | Google Maps |
-| Files | Cloud storage |
+| Files | Laravel Storage (cloud disk) |
+| Queues | Laravel Queues and Scheduler |
 | Documents | PDF generation (invoices, quotations) |
-| Deployment | Docker, Nginx, Linux server |
+| Deployment | Docker, Nginx + PHP-FPM, Linux server |
 
-> **Note:** the original product spec called for PostgreSQL and NestJS as options. The implemented backend uses **Express + Prisma + MySQL**. Treat this README as the source of truth.
+> **Note:** the original product spec called for PostgreSQL and NestJS as options. The implemented backend uses **Laravel + MySQL**. Treat this README as the source of truth.
 
 ## Project status
 
-The project was scaffolded in Lovable and is **mid-migration from Supabase to a self-hosted Express + Prisma + MySQL backend**.
+The project was scaffolded in Lovable and is **migrating from Supabase to a self-hosted Laravel + MySQL backend**.
 
 - Migrated / self-hosted: operator approval, lead quota enforcement, eligibility filtering, offer acceptance flow, M-Pesa STK push, SMTP email, PDF invoices.
-- Anything still calling Supabase directly should be moved to the Express API. Before adding new features, check whether the module you touch has been migrated.
+- Anything still calling Supabase directly should be moved to the Laravel API. Before adding new features, check whether the module you touch has been migrated.
 
 <!-- TODO (team): keep a checklist here of modules still on Supabase. -->
 
@@ -102,54 +103,65 @@ These rules are enforced in the backend; please do not bypass them in the UI.
 ## Getting started
 
 ### Prerequisites
+- PHP 8.2+ with extensions: `mbstring`, `xml`, `curl`, `pdo_mysql`, `gd`, `zip`, `bcmath`
+- Composer 2
 - Node.js 20+ and npm ([install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating))
 - MySQL 8+
 - Git
 
-### 1. Clone and install
+### 1. Clone
 ```sh
 git clone <this-repository-url>
 cd <repository-name>
-npm install
-cd backend && npm install && cd ..
 ```
-<!-- Adjust paths if backend lives elsewhere. -->
 
-### 2. Create the database
+### 2. Backend setup (Laravel)
+```sh
+cd backend
+composer install
+cp .env.example .env
+php artisan key:generate
+```
+<!-- Adjust paths if the Laravel app lives elsewhere. -->
+
+### 3. Create the database
 ```sql
 CREATE DATABASE safariconnect CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 ```
 
-### 3. Configure environment
-Copy the example env files and fill them in (see [Environment variables](#environment-variables)):
-```sh
-cp .env.example .env
-cp backend/.env.example backend/.env
-```
+### 4. Configure environment
+Fill in `backend/.env` (see [Environment variables](#environment-variables)).
 
-> **Important:** if your MySQL password contains special characters (`@`, `#`, `/`, `:`), it must be **percent-encoded** inside `DATABASE_URL`. For example `p@ss` becomes `p%40ss`.
-
-### 4. Run migrations and seed
+### 5. Run migrations and seed
 ```sh
-cd backend
-npx prisma migrate dev
-npx prisma db seed   # if a seed script exists
+php artisan migrate
+php artisan db:seed
+php artisan storage:link
 cd ..
 ```
 
-### 5. Start the app
+### 6. Frontend setup
 ```sh
-# Terminal 1: backend (http://localhost:4000)
-cd backend && npm run dev
+npm install
+cp .env.example .env
+```
 
-# Terminal 2: frontend (http://localhost:8080)
+### 7. Start the app
+```sh
+# Terminal 1: Laravel API (http://localhost:8000)
+cd backend && php artisan serve
+
+# Terminal 2: queue worker (emails, SMS, notifications)
+cd backend && php artisan queue:work
+
+# Terminal 3: frontend (http://localhost:8080)
 npm run dev
 ```
 
 | Service | URL |
 |---|---|
 | Frontend | http://localhost:8080 |
-| Backend API | http://localhost:4000 |
+| Laravel API | http://localhost:8000 |
 
 ## Environment variables
 
@@ -157,22 +169,35 @@ Never commit real secrets. Share them with your collaborator through a password 
 
 **Backend (`backend/.env`)**
 ```env
-PORT=4000
-NODE_ENV=development
-
-# Percent-encode special characters in the password
-DATABASE_URL="mysql://USER:ENCODED_PASSWORD@localhost:3306/safariconnect"
-
-JWT_SECRET=change-me
-JWT_EXPIRES_IN=7d
+APP_NAME=SafariConnect
+APP_ENV=local
+APP_KEY=
+APP_DEBUG=true
+APP_URL=http://localhost:8000
 FRONTEND_URL=http://localhost:8080
 
-# SMTP (Nodemailer)
-SMTP_HOST=
-SMTP_PORT=
-SMTP_USER=
-SMTP_PASS=
-MAIL_FROM=
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=safariconnect
+DB_USERNAME=
+DB_PASSWORD=
+
+QUEUE_CONNECTION=database
+FILESYSTEM_DISK=public
+
+# Auth
+JWT_SECRET=
+JWT_TTL=60
+
+# Mail (SMTP)
+MAIL_MAILER=smtp
+MAIL_HOST=
+MAIL_PORT=
+MAIL_USERNAME=
+MAIL_PASSWORD=
+MAIL_FROM_ADDRESS=
+MAIL_FROM_NAME="SafariConnect Kenya"
 
 # IntaSend (M-Pesa STK Push)
 INTASEND_PUBLISHABLE_KEY=
@@ -186,15 +211,12 @@ AT_API_KEY=
 # Google
 GOOGLE_MAPS_API_KEY=
 GOOGLE_CLIENT_ID=
-
-# File storage
-STORAGE_BUCKET=
-STORAGE_KEY=
+GOOGLE_CLIENT_SECRET=
 ```
 
 **Frontend (`.env`)**
 ```env
-VITE_API_URL=http://localhost:4000
+VITE_API_URL=http://localhost:8000/api
 VITE_GOOGLE_MAPS_API_KEY=
 ```
 
@@ -207,44 +229,63 @@ VITE_GOOGLE_MAPS_API_KEY=
 <!-- Update to match the repo. Suggested layout: -->
 ```
 .
-├── src/                  # Frontend (TanStack Start + React)
-│   ├── routes/           # File-based routes (public, customer, operator, admin)
-│   ├── components/       # Reusable UI (shadcn/ui based)
-│   ├── lib/              # API client, utils, hooks
+├── src/                      # Frontend (TanStack Start + React)
+│   ├── routes/               # File-based routes (public, customer, operator, admin)
+│   ├── components/           # Reusable UI (shadcn/ui based)
+│   ├── lib/                  # API client, utils, hooks
 │   └── styles/
-├── backend/
-│   ├── prisma/           # schema.prisma, migrations, seed
-│   └── src/
-│       ├── routes/       # Express routes
-│       ├── controllers/
-│       ├── services/     # Leads, quotations, payments, notifications
-│       ├── middleware/   # Auth, roles, rate limiting, validation
-│       └── utils/
+├── backend/                  # Laravel API
+│   ├── app/
+│   │   ├── Http/
+│   │   │   ├── Controllers/
+│   │   │   ├── Middleware/   # Auth, roles, throttling
+│   │   │   └── Requests/     # Validation
+│   │   ├── Models/
+│   │   ├── Services/         # Leads, quotations, payments, notifications
+│   │   ├── Jobs/             # Queued emails, SMS, PDFs
+│   │   └── Policies/
+│   ├── database/
+│   │   ├── migrations/
+│   │   ├── seeders/
+│   │   └── factories/
+│   ├── routes/api.php
+│   └── tests/
 ├── public/
 └── README.md
 ```
 
-## Scripts
+## Commands
 
 | Command | Description |
 |---|---|
 | `npm run dev` | Start the frontend dev server (port 8080) |
 | `npm run build` | Production frontend build |
-| `npm run lint` | Lint the codebase |
-| `cd backend && npm run dev` | Start the API with reload (port 4000) |
-| `npx prisma migrate dev` | Create / apply a migration locally |
-| `npx prisma migrate deploy` | Apply migrations in production |
-| `npx prisma studio` | Browse the database in a UI |
+| `npm run lint` | Lint the frontend |
+| `php artisan serve` | Run the API locally (port 8000) |
+| `php artisan queue:work` | Process queued jobs |
+| `php artisan schedule:work` | Run the scheduler locally |
+| `php artisan migrate` | Apply migrations |
+| `php artisan migrate:fresh --seed` | Reset and reseed the DB (**local only**) |
+| `php artisan route:list` | List API routes |
+| `php artisan test` | Run backend tests |
 
-<!-- Confirm script names against package.json. -->
+<!-- Confirm against package.json and composer.json. -->
 
 ## Deployment
 
-Target: Docker + Nginx on a Linux server, HTTPS enabled, daily database backups.
+Target: Docker + Nginx (PHP-FPM) on a Linux server, HTTPS enabled, daily database backups.
 
-- Run the frontend and backend as separate containers behind Nginx.
-- Use `prisma migrate deploy` (never `migrate dev`) in production.
-- Production uses live IntaSend keys and the production SMTP account.
+- Run the frontend and backend as separate containers or services behind Nginx.
+- Run a queue worker under Supervisor and add the scheduler cron entry:
+  `* * * * * cd /path/to/backend && php artisan schedule:run >> /dev/null 2>&1`
+- On each deploy:
+```sh
+  composer install --no-dev --optimize-autoloader
+  php artisan migrate --force
+  php artisan config:cache && php artisan route:cache && php artisan view:cache
+  php artisan queue:restart
+```
+- Production uses `APP_ENV=production`, `APP_DEBUG=false`, live IntaSend keys and the production SMTP account.
 - Security checklist: HTTPS, role-based permissions, optional 2FA, rate limiting, CAPTCHA, encrypted sensitive data, audit logs, session management.
 
 ## Roadmap
