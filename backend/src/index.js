@@ -1,5 +1,5 @@
 // backend/src/index.js
-require('dotenv').config();
+require('../loadEnv');
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -17,6 +17,9 @@ const webhooksRoutes = require('./routes/webhooks');
 const adminRoutes = require('./routes/admin'); // <-- Newly added admin routes
 
 const app = express();
+
+// Behind nginx / cPanel / Cloudflare reverse proxy
+app.set('trust proxy', 1);
 
 // 1. Set security HTTP headers immediately
 app.use(helmet());
@@ -64,7 +67,7 @@ app.use(cors({
     if (allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
-      callback(new Error('Blocked by CORS policy: Origin not allowed.'));
+      callback(null, false);
     }
   },
   credentials: true,
@@ -90,7 +93,13 @@ app.use('/api/admin', adminRoutes); // <-- Registered admin router endpoint
 
 app.use((err, req, res, next) => {
   console.error(err);
-  res.status(err.status || 500).json({ error: err.message || 'Internal server error' });
+  const debug = String(process.env.APP_DEBUG || '').toLowerCase() === 'true';
+  const status = err.status || 500;
+  res.status(status).json({
+    error: debug || status < 500
+      ? (err.message || 'Internal server error')
+      : 'Internal server error',
+  });
 });
 
 const PORT = process.env.PORT || 4000;

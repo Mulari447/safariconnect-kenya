@@ -198,7 +198,7 @@ function MyTripsPage() {
             {selectedQuote.attachmentUrl && (
               <div className="pt-2">
                 <a
-                  href={`http://localhost:4000${selectedQuote.attachmentUrl}`}
+                  href={`${import.meta.env.VITE_API_URL || ""}${selectedQuote.attachmentUrl}`}
                   target="_blank"
                   rel="noreferrer"
                   className="inline-flex items-center gap-2 rounded-xl bg-primary/10 px-4 py-3 text-sm font-semibold text-primary hover:bg-primary/20 transition-colors w-full justify-center"
